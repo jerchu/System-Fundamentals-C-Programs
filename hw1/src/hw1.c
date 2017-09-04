@@ -27,5 +27,72 @@
  * @return Refer to homework document for the return value of this function.
  */
 unsigned short validargs(int argc, char **argv) {
-    return 0x8000;
+    short return_state = 0x0000;
+    for(int i = 0; i < argc; i++)
+    {
+        char* arg = *(argv+i);
+        if(*(arg+1) == 'h')
+            return 0x8000;
+        else if(*(arg+1) == 'p' && i == 1)
+        {
+            return_state = return_state | 0x0000;
+            return_state = return_state | 0x00AA;
+        }
+        else if(*(arg+1) == 'f' && i == 1)
+            return_state = return_state | 0x4000;
+        else if(*(arg+1) == 'e' && i == 2)
+            return_state = return_state | 0x0000;
+        else if(*(arg+1) == 'd' && i == 2)
+            return_state = return_state | 0x2000;
+        else if(*(arg+1) == 'k' && i > 2)
+        {
+            i++;
+            arg = *(argv+i);
+            int *alphabetlength;
+            *alphabetlength = 0;
+            while(*arg != '\n' && *arg != ' ' && *arg != '\0')
+            {
+                if(!isvalidchar(*arg, return_state & 0x4000, alphabetlength))
+                    return 0;
+                arg++;
+            }
+            extern key = *(argv+i);
+        }
+        else if(*arg+1)
+    }
+    return return_state;
+}
+
+int isvalidchar(char symbol, int ciphertype, int *alphabetlength)
+{
+    char *tempalphabet;
+    char *repeatcheck;
+    int alphalengthset = *alphabetlength > 0
+    if(ciphertype) //fractionated
+    {
+        tempalphabet = extern fm_alphabet;
+        repeatcheck = extern fm_key;
+        if(*(repeatcheck+(symbol-'A'))) //check if repeat
+            return 0;
+        *(repeatcheck+(symbol-'A')) = 1; //is taken
+    }
+
+    else //Polybius
+    {
+        tempalphabet = extern polybius_alphabet;
+        repeatcheck = extern polybius_table;
+        if(*(repeatcheck+symbol)) //check if repeat
+            return 0;
+        *(repeatcheck+symbol) = 1; //is taken
+    }
+
+    while(*tempalphabet != '\0')
+    {
+        if(*tempalphabet == symbol)
+            return 1;
+        tempcipher++;
+        if(!alphalengthset)
+            *alphabetlength++;
+    }
+    return 0;
 }
