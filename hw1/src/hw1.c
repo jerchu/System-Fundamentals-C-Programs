@@ -36,6 +36,8 @@ unsigned short validargs(int argc, char **argv) {
     {
         count++;
         char* arg = *(argv+i);
+        if (*(arg+2) != 0)
+            return 0;
         if(*(arg+1) == 'h')
             return 0x8000;
         else if(*(arg+1) == 'p' && count == 1) //Polybius
@@ -62,6 +64,8 @@ unsigned short validargs(int argc, char **argv) {
         }
         else if(*(arg+1) == 'r' && count > 2)
         {
+            if(return_state & 0x4000)
+                return 0;
             if(return_state & 0x00F0)
                 return 0;
             i++;
@@ -78,6 +82,8 @@ unsigned short validargs(int argc, char **argv) {
         }
         else if(*(arg+1) == 'c' && count > 2)
         {
+            if(return_state & 0x4000)
+                return 0;
             if(return_state & 0x000F)
                 return 0;
             i++;
@@ -94,10 +100,10 @@ unsigned short validargs(int argc, char **argv) {
         }
         else
         {
-            count--;
+            count = 0;
         }
     }
-    if (!(return_state & 0x00FF))
+    if (!(return_state & 0x00FF) && !(return_state & 0x4000))
         return_state = return_state | 0x00AA;
     if(count < 2)
         return 0;
@@ -153,4 +159,56 @@ int isvalidchar(char symbol, int ciphertype)
         pos++;
     }
     return 0;
+}
+
+int generatepolybiustable(short mode)
+{
+    int key_length = 0;
+    while (*(key+key_length))
+    {
+        *(polybius_table+key_length) = *(key+key_length);
+        key_length++;
+    }
+    int rows = (mode & 0x00F0) / 0x0010;
+    int cols = mode & 0x000F;
+    int table_offset = 0; //offset from key insertion *SHOULD BE NEGATIVE*
+    int alphabet_end = 0;
+    for(int i = key_length; i < rows * cols; i++)
+    {
+        if(!*(polybius_alphabet+i-key_length) || alphabet_end)
+        {
+            alphabet_end = 1;
+            *(polybius_table+i+table_offset) = 0;
+            continue;
+        }
+        *(polybius_table+i+table_offset) = *(polybius_alphabet+i-key_length);
+        for(int j = 0; j < key_length; j++)
+        {
+            if(*(polybius_alphabet+i-key_length) == *(key+j))
+            {
+                table_offset--;
+            }
+        }
+    }
+    //printf("%s\n", polybius_table);
+    return 1;
+}
+
+int encryptpolybius(short mode, char input)
+{
+    int cols = mode & 0x000F;
+    if(input == ' ' || input == '\n' || input == '\t')
+        printf("%c", input);
+    else
+    {
+        int j = 0;
+        while(*(polybius_table+j) != input)
+        {
+            if(!*(polybius_table))
+                return 0;
+            j++;
+        }
+        printf("%X%X", j/cols, j%cols);
+    }
+    return 1;
 }

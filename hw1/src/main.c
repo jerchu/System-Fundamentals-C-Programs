@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "hw1.h"
 #include "debug.h"
@@ -30,24 +31,35 @@ int main(int argc, char **argv)
 
     if(!mode){
         printf("an error occured\n");
-        return EXIT_FAILURE;
+        USAGE(*argv, EXIT_FAILURE);
     }
 
-    if(mode & 0x4000) {
+    if(mode & 0x4000) { //fractionated
         printf("fractionated\n");
     }
-    else{
+    else{ //Polybius
         printf("Polybius\n");
+        generatepolybiustable(mode);
     }
 
-    if(mode & 0x2000) {
+    if(mode & 0x2000) { //decrypt
         printf("decrypt\n");
     }
-    else{
+    else{ //encrypt
         printf("encrypt\n");
+        //printf("input: ");
+        char checkline = getchar();
+        //printf("output: ");
+        if(!encryptpolybius(mode, checkline))
+                return 0;
+        while((checkline = getchar()) != EOF)
+        {
+            if(!encryptpolybius(mode, checkline))
+                return 0;
+        }
     }
 
-    if(mode & 0x00F0)
+    /*if(mode & 0x00F0)
     {
         printf("rows: %d\n", (mode & 0x00F0) / 0x0010);
     }
@@ -55,9 +67,9 @@ int main(int argc, char **argv)
     if(mode &0x000F)
     {
         printf("cols: %d\n", (mode & 0x000F));
-    }
+    }*/
 
-    printf("%s\n", key);
+    //printf("%s\n", key);
 
     return EXIT_SUCCESS;
 }
