@@ -212,3 +212,12 @@ int encryptpolybius(short mode, char input)
     }
     return 1;
 }
+
+int decryptpolybius(short mode, int row, int col)
+{
+    //printf("%d%d\n", row, col);
+    int cols = mode & 0x000F;
+    int pos = row * cols + col;
+    printf("%c", *(polybius_table+pos));
+    return 1;
+}

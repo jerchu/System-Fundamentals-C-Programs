@@ -44,6 +44,38 @@ int main(int argc, char **argv)
 
     if(mode & 0x2000) { //decrypt
         printf("decrypt\n");
+        char checkline = getchar();
+        int row = -1;
+        int col = -1;
+        while(checkline != EOF)
+        {
+            if(checkline == '\n' || checkline == ' ' || checkline == '\t')
+                printf("%c", checkline);
+            else if(row < 0 || col < 0)
+            {
+                if(row < 0)
+                {
+                    if(checkline > 'A')
+                        row = checkline - 'A' + 10;
+                    else
+                        row = checkline - '0';
+                }
+                else
+                {
+                    if(checkline > 'A')
+                        col = checkline - 'A' + 10;
+                    else
+                        col = checkline - '0';
+                }
+            }
+            if(row >= 0 && col >= 0)
+            {
+                decryptpolybius(mode, row, col);
+                row = -1;
+                col = -1;
+            }
+            checkline = getchar();
+        }
     }
     else{ //encrypt
         printf("encrypt\n");
