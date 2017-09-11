@@ -35,61 +35,134 @@ int main(int argc, char **argv)
     }
 
     if(mode & 0x4000) { //fractionated
-        printf("fractionated\n");
-    }
-    else{ //Polybius
-        printf("Polybius\n");
-        generatepolybiustable(mode);
-    }
-
-    if(mode & 0x2000) { //decrypt
-        printf("decrypt\n");
-        char checkline = getchar();
-        int row = -1;
-        int col = -1;
-        while(checkline != EOF)
-        {
-            if(checkline == '\n' || checkline == ' ' || checkline == '\t')
-                printf("%c", checkline);
-            else if(row < 0 || col < 0)
+        generatemorsetable();
+        if(mode & 0x2000){ //decrypt
+            printf("decrypt");
+        }
+        else{ //encrypt
+            long space = 0;
+            char *buffer = (char *)&space;
+            char checkline = getchar();
+            int last_char_space = 0;
+            if(!encryptmorse(buffer, checkline))
+                return EXIT_FAILURE;
+            while((checkline = getchar()) != EOF)
             {
-                if(row < 0)
+                if(last_char_space)
                 {
-                    if(checkline > 'A')
-                        row = checkline - 'A' + 10;
-                    else
-                        row = checkline - '0';
+                    debug("I chose last_char_space because %d", last_char_space);
+                    if(!(checkline == ' ' || checkline == '\t'))
+                    {
+                        if(!encryptmorse(buffer, checkline))
+                            return EXIT_FAILURE;
+                    }
                 }
                 else
                 {
-                    if(checkline > 'A')
-                        col = checkline - 'A' + 10;
-                    else
-                        col = checkline - '0';
+                    int insert_count = 0;
+                    int i = 0;
+                    while(insert_count < 1 && i < 8)
+                    {
+                        debug("'%c'", *(buffer+i));
+                        if(!*(buffer+i))
+                        {
+                            *(buffer+i) = 'x';
+                            insert_count++;
+                        }
+                        i++;
+                    }
+                    if(!encryptmorse(buffer, checkline))
+                        return EXIT_FAILURE;
                 }
+                if(checkline == ' ' || checkline == '\t')
+                    last_char_space = 1;
+                else
+                {
+                    last_char_space = 0;
+                }
+                while(*(buffer+2))
+                {
+                    debug("%c", *(buffer+2));
+                    debug("%s", buffer);
+                    int i = 0;
+                    while(*(fm_key+i)){
+                        int equal = 1;
+                        for(int j = 0; j < 3; j++){
+                            if(*(buffer+j) != *(*(fractionated_table+i)+j))
+                                equal = 0;
+                        }
+                        if(equal){
+                            debug("%c", *(fm_key+i));
+                            printf("%c", *(fm_key+i));
+                            break;
+                        }
+                        i++;
+
+                    }
+                    for(int j = 0; j < 8; j++)
+                    {
+                        if(j+3 < 8)
+                            *(buffer+j) = *(buffer+3+j);
+                        else
+                            *(buffer+j) = 0;
+                    }
+                }
+                if(checkline == '\n')
+                    printf("\n");
             }
-            if(row >= 0 && col >= 0)
+        }
+    }
+    else{ //Polybius
+        generatepolybiustable(mode);
+        if(mode & 0x2000) { //decrypt
+            char checkline = getchar();
+            int row = -1;
+            int col = -1;
+            while(checkline != EOF)
             {
-                decryptpolybius(mode, row, col);
-                row = -1;
-                col = -1;
+                if(checkline == '\n' || checkline == ' ' || checkline == '\t')
+                    printf("%c", checkline);
+                else if(row < 0 || col < 0)
+                {
+                    if(row < 0)
+                    {
+                        if(checkline > 'A')
+                            row = checkline - 'A' + 10;
+                        else
+                            row = checkline - '0';
+                    }
+                    else
+                    {
+                        if(checkline > 'A')
+                            col = checkline - 'A' + 10;
+                        else
+                            col = checkline - '0';
+                    }
+                }
+                if(row >= 0 && col >= 0)
+                {
+                    decryptpolybius(mode, row, col);
+                    row = -1;
+                    col = -1;
+                }
+                checkline = getchar();
             }
-            checkline = getchar();
         }
-    }
-    else{ //encrypt
-        printf("encrypt\n");
-        //printf("input: ");
-        char checkline = getchar();
-        //printf("output: ");
-        if(!encryptpolybius(mode, checkline))
-                return 0;
-        while((checkline = getchar()) != EOF)
-        {
+        else{ //encrypt
+            //printf("input: ");
+            char checkline = getchar();
+            //printf("output: ");
             if(!encryptpolybius(mode, checkline))
-                return 0;
+                    return 0;
+            while((checkline = getchar()) != EOF)
+            {
+                if(!encryptpolybius(mode, checkline))
+                    return 0;
+            }
         }
     }
+
+
 
     /*if(mode & 0x00F0)
     {

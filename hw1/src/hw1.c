@@ -1,4 +1,5 @@
 #include "hw1.h"
+#include "debug.h"
 
 #ifdef _STRING_H
 #error "Do not #include <string.h>. You will get a ZERO."
@@ -72,6 +73,8 @@ unsigned short validargs(int argc, char **argv) {
             int j = 0;
             int num = 0;
             while(*(*(argv+i)+j) != '\0' && *(*(argv+i)+j) != ' ' && *(*(argv+i)+j) != '\n'){
+                if(*(*(argv+i)+j) > '9' || *(*(argv+i)+j) < 0)
+                    return 0;
                 num *= 10;
                 num += *(*(argv+i)+j) - '0';
                 j++;
@@ -90,6 +93,8 @@ unsigned short validargs(int argc, char **argv) {
             int j = 0;
             int num = 0;
             while(*(*(argv+i)+j) != '\0' && *(*(argv+i)+j) != ' ' && *(*(argv+i)+j) != '\n'){
+                if(*(*(argv+i)+j) > '9' || *(*(argv+i)+j) < 0)
+                    return 0;
                 num *= 10;
                 num += *(*(argv+i)+j) - '0';
                 j++;
@@ -219,5 +224,74 @@ int decryptpolybius(short mode, int row, int col)
     int cols = mode & 0x000F;
     int pos = row * cols + col;
     printf("%c", *(polybius_table+pos));
+    return 1;
+}
+
+int generatemorsetable()
+{
+    int key_length = 0;
+    for(int i = 0; *(key+i); i++)
+    {
+        *(fm_key+i) = *(key+i);
+        key_length++;
+    }
+    int offset = 0; //NEGATIVE SO ADD!!!!
+    for(int i = key_length; *(fm_alphabet+i-key_length); i++)
+    {
+        *(fm_key+i+offset) = *(fm_alphabet+i-key_length);
+        for(int j = 0; j < key_length; j++)
+        {
+            if(*(fm_alphabet+i-key_length) == *(key+j))
+                offset--;
+        }
+    }
+    debug("%s", fm_key);
+    return 1;
+}
+
+int encryptmorse(char *buffer, char input)
+{
+    if(input == ' ' || input == '\t' || input == '\n')
+    {
+        int insert_count = 0;
+        int i = 0;
+        while(insert_count < 1 && i < 8)
+        {
+            debug("%c", *(buffer+i));
+            if(!*(buffer+i))
+            {
+                *(buffer+i) = 'x';
+                insert_count++;
+            }
+            i++;
+        }
+    }
+    else
+    {
+        //printf("%s\n", *(morse_table+(input-'!')));
+        if(!*(morse_table+(input-'!')))
+            return 0;
+        //printf("success");
+        const char *morse_str;
+
+        morse_str = *(morse_table+(input-'!'));
+        //printf("success");
+        debug("%s\n", morse_str);
+
+        int i = 0;
+        int j = 0;
+        while(*(morse_str+j) && i < 8)
+        {
+            //debug("%s", (buffer+i));
+            if(!*(buffer+i))
+            {
+                *(buffer+i) = *(morse_str+j);
+                j++;
+            }
+            i++;
+        }
+        //printf("loop success");
+    }
+
     return 1;
 }
