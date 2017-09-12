@@ -271,7 +271,7 @@ int encryptmorse(char *buffer, char input)
     else
     {
         //printf("%s\n", *(morse_table+(input-'!')));
-        if(!*(morse_table+(input-'!')))
+        if(!**(morse_table+(input-'!')))
             return 0;
         //printf("success");
         const char *morse_str;

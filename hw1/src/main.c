@@ -47,6 +47,7 @@ int main(int argc, char **argv)
             int prev_nl = 0;
             while((checkline = getchar()) != EOF)
             {
+                debug("prep_print_space: %d", prep_print_space);
                 if(checkline == '\n'){
                     if(prev_nl)
                         printf("\n");
@@ -81,7 +82,12 @@ int main(int argc, char **argv)
                     {
                         if(prep_print_space)
                         {
-                            printf(" ");
+                            if(print_nl){
+                                printf("\n");
+                                print_nl--;
+                            }
+                            else
+                                printf(" ");
                             prep_print_space = 0;
                         }
                         *(buffer+index) = 0;
