@@ -14,3 +14,9 @@ int decryptpolybius(short mode, int row, int col);
 int generatemorsetable();
 
 int encryptmorse(char *buffer, char input);
+
+int decryptmorse(char *buffer, char input, size_t length);
+
+int getindex(char *buffer, char value, size_t length);
+
+int bufferencrypt(char *buffer);

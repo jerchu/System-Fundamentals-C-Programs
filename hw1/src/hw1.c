@@ -253,6 +253,7 @@ int encryptmorse(char *buffer, char input)
 {
     if(input == ' ' || input == '\t' || input == '\n')
     {
+        debug("%c", input);
         int insert_count = 0;
         int i = 0;
         while(insert_count < 1 && i < 8)
@@ -265,6 +266,7 @@ int encryptmorse(char *buffer, char input)
             }
             i++;
         }
+        debug("buffer: %s", buffer);
     }
     else
     {
@@ -293,5 +295,76 @@ int encryptmorse(char *buffer, char input)
         //printf("loop success");
     }
 
+    return 1;
+}
+
+int decryptmorse(char *buffer, char input, size_t length)
+{
+    /*if(input == '\n')
+    {
+        printf("\n");
+        return 1;
+    }*/
+    //debug("current input: %c", input);
+    int index;
+    for(index = 0; *(fm_key+index) && *(fm_key+index) != input; index++);
+    //debug("index: %d", index);
+    const char *fm_str = *(fractionated_table+index);
+    int i = 0;
+    int j = 0;
+    int count;
+    while(*(fm_str+j) && i < length)
+    {
+        //debug("%s", (buffer+i));
+        if(!*(buffer+i))
+        {
+            *(buffer+i) = *(fm_str+j);
+            j++;
+        }
+        i++;
+    }
+    //debug("buffer state: %s", buffer);
+    return 1;
+}
+
+int getindex(char * buffer, char value, size_t length)
+{
+    int i;
+    for(i = 0; *(buffer+i) != value && i < length; i++);
+    if(i == length)
+        return -1;
+    else
+        return i;
+}
+
+int bufferencrypt(char *buffer)
+{
+    while(*(buffer+2))
+    {
+        debug("%c", *(buffer+2));
+        debug("%s", buffer);
+        int i = 0;
+        while(*(fm_key+i)){
+            int equal = 1;
+            for(int j = 0; j < 3; j++){
+                if(*(buffer+j) != *(*(fractionated_table+i)+j))
+                    equal = 0;
+            }
+            if(equal){
+                debug("%c", *(fm_key+i));
+                printf("%c", *(fm_key+i));
+                break;
+            }
+            i++;
+
+        }
+        for(int j = 0; j < 8; j++)
+        {
+            if(j+3 < 8)
+                *(buffer+j) = *(buffer+3+j);
+            else
+                *(buffer+j) = 0;
+        }
+    }
     return 1;
 }

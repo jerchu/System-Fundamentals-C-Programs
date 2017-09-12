@@ -37,7 +37,127 @@ int main(int argc, char **argv)
     if(mode & 0x4000) { //fractionated
         generatemorsetable();
         if(mode & 0x2000){ //decrypt
-            printf("decrypt");
+            long space = 0;
+            char *buffer = polybius_table;
+            char checkline;
+            /*if(!decryptmorse(buffer, checkline))
+                return EXIT_FAILURE;*/
+            int prep_print_space = 0;
+            int print_nl = 0;
+            int prev_nl = 0;
+            while((checkline = getchar()) != EOF)
+            {
+                if(checkline == '\n'){
+                    if(prev_nl)
+                        printf("\n");
+                    else
+                        print_nl++;
+                    prev_nl = 1;
+                }
+                else{
+                    prev_nl = 0;
+                }
+                if(prep_print_space){
+                    if(print_nl){
+                        printf("\n");
+                        print_nl--;
+                    }
+                    else
+                        printf(" ");
+                    prep_print_space = 0;
+                }
+                if(checkline != '\n' && !decryptmorse(buffer, checkline, sizeof(polybius_table)))
+                    return EXIT_FAILURE;
+                int index;
+                while((index = getindex(buffer, 'x', sizeof(polybius_table)))+1 > 0)
+                {
+                    debug("buffer: %s", buffer);
+                    if(index == 0)
+                    {
+                        prep_print_space = 1;
+                        *(buffer+index) = 0;
+                    }
+                    else
+                    {
+                        if(prep_print_space)
+                        {
+                            printf(" ");
+                            prep_print_space = 0;
+                        }
+                        *(buffer+index) = 0;
+                        debug("buffer: %s", buffer);
+                        int valid = 0;
+                        for(int i = 0; i < 'z' - '!'; i++)
+                        {
+                            int equal = 2;
+                            for(int j = 0; *(buffer+j) && *(*(morse_table+i)+j); j++)
+                            {
+                                if(*(buffer+j) != *(*(morse_table+i)+j))
+                                {
+                                    equal = 0;
+                                    break;
+                                }
+                                if(*(buffer+j+1) == '\0' && *(*(morse_table+i)+j+1) == '\0')
+                                {
+                                    equal = 1;
+                                    break;
+                                }
+                            }
+                            if(equal == 1)
+                            {
+                                printf("%c", i + '!');
+                                valid = 1;
+                                break;
+                            }
+                        }
+                        if(!valid)
+                            return EXIT_FAILURE;
+                    }
+                    int count;
+                    for (count = index+1; *(buffer+count); count++);
+                    for(int j = 0; j < count; j++)
+                    {
+                        if(j+index+1 < count)
+                            *(buffer+j) = *(buffer+index+1+j);
+                        else
+                            *(buffer+j) = 0;
+                    }
+                }
+            }
+            while(print_nl){
+                int count;
+                for(count = 0; *(buffer+count); count++);
+                if(count){
+                    int valid = 0;
+                    for(int i = 0; i < 'z' - '!'; i++)
+                    {
+                        int equal = 2;
+                        for(int j = 0; *(buffer+j) && *(*(morse_table+i)+j); j++)
+                        {
+                            if(*(buffer+j) != *(*(morse_table+i)+j))
+                            {
+                                equal = 0;
+                                break;
+                            }
+                            if(*(buffer+j+1) == '\0' && *(*(morse_table+i)+j+1) == '\0')
+                            {
+                                equal = 1;
+                                break;
+                            }
+                        }
+                        if(equal == 1)
+                        {
+                            printf("%c", i + '!');
+                            valid = 1;
+                            break;
+                        }
+                    }
+                    if(!valid)
+                        return EXIT_FAILURE;
+                }
+                printf("\n");
+                print_nl--;
+            }
         }
         else{ //encrypt
             long space = 0;
@@ -50,7 +170,7 @@ int main(int argc, char **argv)
             {
                 if(last_char_space)
                 {
-                    debug("I chose last_char_space because %d", last_char_space);
+                    //debug("I chose last_char_space because %d", last_char_space);
                     if(!(checkline == ' ' || checkline == '\t'))
                     {
                         if(!encryptmorse(buffer, checkline))
@@ -71,6 +191,7 @@ int main(int argc, char **argv)
                         }
                         i++;
                     }
+                    bufferencrypt(buffer);
                     if(!encryptmorse(buffer, checkline))
                         return EXIT_FAILURE;
                 }
@@ -80,35 +201,18 @@ int main(int argc, char **argv)
                 {
                     last_char_space = 0;
                 }
-                while(*(buffer+2))
+                bufferencrypt(buffer);
+                if(checkline == '\n')
                 {
-                    debug("%c", *(buffer+2));
-                    debug("%s", buffer);
-                    int i = 0;
-                    while(*(fm_key+i)){
-                        int equal = 1;
-                        for(int j = 0; j < 3; j++){
-                            if(*(buffer+j) != *(*(fractionated_table+i)+j))
-                                equal = 0;
-                        }
-                        if(equal){
-                            debug("%c", *(fm_key+i));
-                            printf("%c", *(fm_key+i));
+                    printf("\n");
+                    /*for(int i = 0; *(buffer+i); i++){
+                        if(*(buffer+i) == 'x'){
+                            *(buffer+i) = 0;
                             break;
                         }
-                        i++;
-
-                    }
-                    for(int j = 0; j < 8; j++)
-                    {
-                        if(j+3 < 8)
-                            *(buffer+j) = *(buffer+3+j);
-                        else
-                            *(buffer+j) = 0;
-                    }
+                    }*/
+                    last_char_space = 1;
                 }
-                if(checkline == '\n')
-                    printf("\n");
             }
         }
     }
