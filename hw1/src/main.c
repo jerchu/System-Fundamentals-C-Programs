@@ -49,7 +49,7 @@ int main(int argc, char **argv)
             {
                 debug("prep_print_space: %d", prep_print_space);
                 if(checkline == '\n'){
-                    if(prev_nl)
+                    if(prev_nl && print_nl)
                         printf("\n");
                     else
                         print_nl++;
