@@ -1,5 +1,6 @@
 #include <criterion/criterion.h>
 //#include "utf.h"
+#include "debug.h"
 #include "wrappers.h"
 
 Test(utf16_suite, code_point_surrogate_pair) {
@@ -107,6 +108,7 @@ Test(args_suite, join_string_array) {
     char *a[] = {"hello", "world", NULL};
 
     char *s = join_string_array(2, a);
+    //debug("%s", s);
 
     cr_assert_str_eq(s, "hello world ");
     free(s);

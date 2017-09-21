@@ -91,7 +91,14 @@ char*
 join_string_array(int count, char *array[])
 {
   char *ret;
-  char charArray[count];
+  size_t tot_len = 0;
+  for(int i = 0; i <= count; i++){
+    if(array[i] != NULL)
+      tot_len += strlen(array[i]);
+    tot_len++;
+  }
+  //debug("tot_len: %zu", tot_len);
+  char *charArray = calloc(tot_len, 1);
   int i;
   int len = 0, /*str_len,*/ cur_str_len;
 
@@ -105,7 +112,7 @@ join_string_array(int count, char *array[])
     memecpy(ret + len, " ", 1);
     len += 1;
   }
-
+  //debug("%s", ret);
   return ret;
 }
 

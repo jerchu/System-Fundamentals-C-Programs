@@ -65,10 +65,10 @@ reverse_bytes(void* bufp, size_t count)
   char* ptr = bufp;
   char temp;
   int i, j;
-  for (i = (count - 1), j = 0; j < i; --i, ++j, temp=~temp) {
+  for (i = (count - 1), j = 0; j < i; i--, j++/*, temp=~temp*/) {
     temp = ptr[i];
-    ptr[j] = ptr[i+temp];
     ptr[i] = ptr[j];
+    ptr[j] = temp;
   }
 }
 
