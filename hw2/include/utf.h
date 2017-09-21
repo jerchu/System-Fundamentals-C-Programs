@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "wrappers.h"
+//#include "wrappers.h"
 
 #define TOP_TWO_BYTES_FROM_THREE(b) ((b & 0xFFFF00) >> 8)
 #define LOWER_TWO_BYTES(b) ((b & 0xFFFF))
@@ -10,9 +10,9 @@
 #define AS_BYTE(x) ((char*)x)
 #define AS_GLYF(x) ((utf8_glyph_t*)x)
 
-const char *STR_UTF16BE  = "UTF16BE";
-char *const STR_UTF16LE = "UTF16LE";
-char const *STR_UTF8  = "UTF8";
+extern const char *STR_UTF16BE;
+extern char *const STR_UTF16LE;
+extern char const *STR_UTF8;
 
 typedef enum { UTF16LE = 0xFFFE, UTF16BE = 0xFEFF, UTF8 = 0xBFBBEF } format_t;
 
@@ -141,7 +141,7 @@ size_t utf8_glyph_size_of_code_point(code_point_t code_point);
 
 void print_state();
 
-char *bom_to_string(format_t bom);
+const char *bom_to_string(format_t bom);
 
 size_t remaining_utf8_bytes(utf8_byte_t first_byte);
 
@@ -171,4 +171,4 @@ utf16_glyph_t code_point_to_utf16be_glyph(code_point_t code_point, size_t *size_
             "OUTPUT_FILE Output file\n"                                        \
             "            Will contain a Byte Order Marking (BOM)\n",           \
             (prog_name));                                                      \
-  } while (0)
+  } while (0);

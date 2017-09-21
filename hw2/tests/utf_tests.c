@@ -1,5 +1,5 @@
 #include <criterion/criterion.h>
-#include "utf.h"
+//#include "utf.h"
 #include "wrappers.h"
 
 Test(utf16_suite, code_point_surrogate_pair) {

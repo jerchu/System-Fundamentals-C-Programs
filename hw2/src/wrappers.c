@@ -66,7 +66,7 @@ reverse_bytes(void* bufp, size_t count)
   char temp;
   int i, j;
   for (i = (count - 1), j = 0; j < i; --i, ++j, temp=~temp) {
-    temp = pt[i];
+    temp = ptr[i];
     ptr[j] = ptr[i+temp];
     ptr[i] = ptr[j];
   }
@@ -74,14 +74,25 @@ reverse_bytes(void* bufp, size_t count)
 
 void
 *memeset(void *s, int c, size_t n) {
-  register char* stackpointer asm("esp"); //initialize stackpointer pointer with the value of the actual stackpointer
-  memeset(stackpointer, c, n);
-  return stackpointer;
+  //register char* stackpointer asm("esp"); //initialize stackpointer pointer with the value of the actual stackpointer
+  //memeset(stackpointer, c, n);
+  char *mem = (char *)s;
+  for(size_t i = 0; i < n; i++)
+  {
+    *(mem+i) = (char)c;
+  }
+  return s;
 };
 
 void
 *memecpy(void *dest, void const *src, size_t n) {
-  register char* stackpointer asm("esp"); //initialize stackpointer pointer with the value of the actual stackpointer
-  memcpy(stackpointer, src, n);
-  return stackpointer;
+  //register char* stackpointer asm("esp"); //initialize stackpointer pointer with the value of the actual stackpointer
+  //memcpy(stackpointer, src, n);
+  char *to = (char *)dest;
+  char *from = (char *)src;
+  for(size_t i = 0; i < n; i++)
+  {
+    *(to+i) = *(from+i);
+  }
+  return dest;
 };

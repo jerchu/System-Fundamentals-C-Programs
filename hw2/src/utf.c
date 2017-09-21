@@ -1,8 +1,12 @@
-#include "utf.h"
+//#include "utf.h"
 #include "debug.h"
 #include "wrappers.h"
 #include <sys/sendfile.h>
 #include <unistd.h>
+
+const char *STR_UTF16BE  = "UTF16BE";
+char *const STR_UTF16LE = "UTF16LE";
+char const *STR_UTF8  = "UTF8";
 
 convertion_func_t
 get_encoding_function()
@@ -11,19 +15,19 @@ get_encoding_function()
     (program_state->encoding_from - program_state->encoding_to);
   switch (translate) {
     case utf8_to_utf16le:
-      return from_utf8_to_utf16le();
+      return from_utf8_to_utf16le;
     case utf8_to_utf16be:
-      return from_utf8_to_utf16be();
+      return from_utf8_to_utf16be;
     case utf16le_to_utf16be:
-      return from_utf16le_to_utf16be();
+      return from_utf16le_to_utf16be;
     case utf16be_to_utf16le:
-      return from_utf16be_to_utf16le();
+      return from_utf16be_to_utf16le;
     case utf16be_to_utf8:
-      return from_utf16be_to_utf8();
+      return from_utf16be_to_utf8;
     case utf16le_to_utf8:
-      return from_utf16le_to_utf8();
+      return from_utf16le_to_utf8;
     case transcribe_file:
-      return transcribe();
+      return transcribe;
   }
   return NULL;
 }
@@ -107,11 +111,11 @@ utf16_glyph_to_code_point(utf16_glyph_t *glyph)
 {
   code_point_t ret = 0;
   if(!is_upper_surrogate_pair(*glyph)) {
-    ret = glyph->upper_bytes;
+    ret = glyph->upper_bytes; //should be lower_bytes?????
   }
   else {
-    ret = (((glyph->upper_bytes - 0xD800) << 100) |
-          ((glyph->lower_bytes - 0xDC00) & 0x3FF)) +
+    ret = (((glyph->upper_bytes - 0xD800) << 10) |
+          (glyph->lower_bytes - 0xDC00)) +
           0x10000;
   }
   return ret;
