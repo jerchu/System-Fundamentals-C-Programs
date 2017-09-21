@@ -98,7 +98,7 @@ join_string_array(int count, char *array[])
     tot_len++;
   }
   //debug("tot_len: %zu", tot_len);
-  char *charArray = calloc(tot_len, 1);
+  char *charArray = Calloc(tot_len, 1);
   int i;
   int len = 0, /*str_len,*/ cur_str_len;
 

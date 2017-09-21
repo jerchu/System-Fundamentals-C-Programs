@@ -39,8 +39,13 @@ void* memeset(void* s, int c, size_t n);
 /**
 * @brief Error checking for memcpy
 *
+<<<<<<< HEAD
 * @param s a pointer to an area in memory to copy to
 * @param c a pointer to an area in memory to copy from
+=======
+* @param dest a pointer to an area in memory to copy to
+* @param src a pointer to an area in memory to copy from
+>>>>>>> HW2_CODE/master
 * @param n number of bytes to copy
 */
 void* memecpy(void* dest, const void* src, size_t n);
