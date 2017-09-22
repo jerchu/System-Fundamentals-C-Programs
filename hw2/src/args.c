@@ -6,10 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int opterr;
-int optopt;
-int optind;
-char *optarg;
+int opterr = 0;
 
 state_t *program_state;
 
@@ -25,23 +22,28 @@ parse_args(int argc, char *argv[])
   free(joined_argv);
 
   program_state = Calloc(1, sizeof(state_t));
-  for (i = 0; optind < argc; ++i) {
+  for (i = 0; optind < argc && (program_state->in_file == NULL || program_state->out_file == NULL); ++i) {
     debug("%d opterr: %d", i, opterr);
     debug("%d optind: %d", i, optind);
     debug("%d optopt: %d", i, optopt);
     debug("%d argv[optind]: %s", i, argv[optind]);
-    if ((option = getopt(argc, argv, "+ei:")) != -1) {
+    if ((option = getopt(argc, argv, "+e:")) != -1) {
       switch (option) {
         case 'e': {
+          //optarg = argv[optind];
+          debug("%s", argv[optind]);
           info("Encoding Argument: %s", optarg);
           if ((program_state->encoding_to = determine_format(optarg)) == 0)
             goto errorcase;
+          else
+            break;
         }
         case '?': {
           if (optopt != 'h')
             fprintf(stderr, KRED "-%c is not a supported argument\n" KNRM,
                     optopt);
-        errorcase:
+          }
+        errorcase: {
           USAGE(argv[0]);
           exit(0);
         }
@@ -54,15 +56,20 @@ parse_args(int argc, char *argv[])
     {
       if (program_state->in_file == NULL) {
         program_state->in_file = argv[optind];
+        debug("%s", program_state->in_file);
       }
       elsif(program_state->out_file == NULL)
       {
         program_state->out_file = argv[optind];
+        debug("%s", program_state->out_file);
       }
       optind++;
     }
   }
-  free(joined_argv);
+  if(strcmp(program_state->in_file, program_state->out_file) == 0 || argc > 5){
+    USAGE(argv[0]);
+    exit(0);
+  }
 }
 
 format_t
