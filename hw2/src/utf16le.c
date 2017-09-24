@@ -49,9 +49,9 @@ from_utf16le_to_utf8(int infile, int outfile)
   utf16_glyph_t utf16_buf;
 
   bom = UTF8;
-  #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  //#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   reverse_bytes(&bom, 3);
-  #endif
+  //#endif
   //write_to_bigendian(outfile, &bom, 3);
 
   while ((bytes_read = read_to_bigendian(infile, &(utf16_buf.upper_bytes), 2)) > 0) {
@@ -71,7 +71,7 @@ from_utf16le_to_utf8(int infile, int outfile)
       utf16_buf.upper_bytes = utf16_buf.lower_bytes;
       utf16_buf.lower_bytes = temp;
     }
-    if(utf16_buf.upper_bytes != 0xFEFF){
+    if(utf16_buf.lower_bytes != 0xFEFF){
       debug("upper: %X lower: %X", utf16_buf.upper_bytes, utf16_buf.lower_bytes);
       code_point = utf16_glyph_to_code_point(&utf16_buf);
       debug("%X", code_point);

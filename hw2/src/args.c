@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 int opterr = 0;
 
@@ -67,6 +68,20 @@ parse_args(int argc, char *argv[])
     }
   }
   if(strcmp(program_state->in_file, program_state->out_file) == 0 || argc > 5){
+    USAGE(argv[0]);
+    exit(0);
+  }
+  int infile = Open(program_state->in_file, O_RDONLY);
+  int outfile = Open(program_state->out_file, O_RDONLY);
+  struct stat infile_stat;
+  struct stat outfile_stat;
+  int file1error = fstat(infile, &infile_stat);
+  int file2error = fstat(outfile, &outfile_stat);
+  if(file1error < 0 || file2error < 0){
+    USAGE(argv[0]);
+    exit(0);
+  }
+  if(infile_stat.st_ino == outfile_stat.st_ino){
     USAGE(argv[0]);
     exit(0);
   }

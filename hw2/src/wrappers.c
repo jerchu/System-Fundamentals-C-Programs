@@ -56,6 +56,7 @@ write_to_bigendian(int fd, void* buf, size_t count)
   reverse_bytes(buf, count);
 #endif*/
   bytes_read = write(fd, buf, count);
+  //debug("%s written to file", (char *)buf);
   return bytes_read;
 }
 
