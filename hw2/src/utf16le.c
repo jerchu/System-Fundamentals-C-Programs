@@ -38,9 +38,53 @@ int
 from_utf16le_to_utf8(int infile, int outfile)
 {
   /* TODO */
-  infile = infile;
-  outfile = outfile;
-  return -1;
+  int ret = 0;
+  int bom;
+  utf8_glyph_t utf8_buf;
+  ssize_t bytes_read;
+  //size_t bytes_to_write;
+  //size_t remaining_bytes;
+  size_t size_of_glyph;
+  code_point_t code_point;
+  utf16_glyph_t utf16_buf;
+
+  bom = UTF8;
+  #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+  reverse_bytes(&bom, 3);
+  #endif
+  //write_to_bigendian(outfile, &bom, 3);
+
+  while ((bytes_read = read_to_bigendian(infile, &(utf16_buf.upper_bytes), 2)) > 0) {
+    //bytes_to_write = 2;
+    //reverse_bytes(&(utf16_buf.upper_bytes), 2);
+    if(is_upper_surrogate_pair(utf16_buf)) {
+      debug("32 bit");
+      if((bytes_read = read_to_bigendian(infile, &(utf16_buf.lower_bytes), 2)) < 0) {
+        break;
+      }
+
+      //reverse_bytes(&(utf16_buf.lower_bytes), 2); //maybe?
+      //bytes_to_write += 2;
+    }
+    else{
+      uint16_t temp = utf16_buf.upper_bytes;
+      utf16_buf.upper_bytes = utf16_buf.lower_bytes;
+      utf16_buf.lower_bytes = temp;
+    }
+    if(utf16_buf.upper_bytes != 0xFEFF){
+      debug("upper: %X lower: %X", utf16_buf.upper_bytes, utf16_buf.lower_bytes);
+      code_point = utf16_glyph_to_code_point(&utf16_buf);
+      debug("%X", code_point);
+      utf8_buf = code_point_to_utf8_glyph(code_point, &size_of_glyph);
+      //debug("%X, %X, %X, %X", utf8_buf.bytes[0], utf8_buf.bytes[1], utf8_buf.bytes[2], utf8_buf.bytes[3])
+      write_to_bigendian(outfile, &utf8_buf, size_of_glyph);
+      utf16_buf.upper_bytes = 0;
+      utf16_buf.lower_bytes = 0;
+    }
+
+  }
+  ret = bytes_read;
+  return ret;
 }
 
 utf16_glyph_t
