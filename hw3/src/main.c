@@ -14,7 +14,7 @@ int main(int argc, char const *argv[]) {
 
     *ptr = 320320320e-320;
 
-    //printf("%f\n", *ptr);
+    printf("%f\n", *ptr);
 
     //sf_free(ptr);
 
