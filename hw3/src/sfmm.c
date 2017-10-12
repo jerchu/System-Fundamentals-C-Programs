@@ -87,7 +87,6 @@ void *sf_malloc(size_t size) {
                 {
                     if(current_block->prev != NULL){
                         current_block->prev->next = current_block->next;
-                        current_block->prev = NULL;
                     }
                     else
                         seg_free_list[i].head = current_block->next;
@@ -95,6 +94,7 @@ void *sf_malloc(size_t size) {
                         current_block->next->prev = current_block->prev;
                         current_block->next = NULL;
                     }
+                    current_block->prev = NULL;
                     allocated_block = current_block;
                     debug("Doing an insert %p", current_block);
                     int second_block_size = 0;
@@ -184,10 +184,34 @@ void sf_free(void *ptr) {
     freed_header->header.allocated = 0;
     sf_footer *freed_footer = (void *)freed_header + (freed_block_size * 16 - 8);
     freed_footer->allocated = 0;
-    //sf_free_header *next_coalesce = freed_header->next;
-    //while(next_coalesce != NULL && !(next_coalesce->header.allocated)){
-
-    //}
+    sf_free_header *next_coalesce = freed_header->next;
+    while(next_coalesce != NULL && !(next_coalesce->header.allocated)){
+        freed_header->header.block_size += next_coalesce->header.block_size;
+        next_coalesce = next_coalesce->next;
+    }
+    if(freed_header->prev != NULL){
+        freed_header->prev->next = next_coalesce;
+    }
+    else{
+        int i;
+        for(i = 0; seg_free_list[i].max < freed_block_size * 16; i++);
+        seg_free_list[i].head = next_coalesce;
+    }
+    if(freed_header->next != NULL){
+        freed_header->next->prev = freed_header->prev;
+        freed_header->next = NULL;
+    }
+    freed_header->prev = NULL;
+    freed_footer = (void *)freed_header + (freed_header->header.block_size * 16 - 8);
+    freed_footer->allocated = 0;
+    freed_footer->block_size = freed_header->header.block_size;
+    int listi;
+    for(listi = 0; seg_free_list[listi].max < freed_header->header.block_size * 16; listi++);
+    freed_header->next = seg_free_list[listi].head;
+    //sf_snapshot();
+    debug("current block next: %p %d", freed_header->next, listi);
+    seg_free_list[listi].head = freed_header;
+    debug("blah %d", 0);
     return;
 
 }
