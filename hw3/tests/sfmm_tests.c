@@ -63,7 +63,7 @@ Test(sf_memsuite_student, free_no_coalesce, .init = sf_mem_init, .fini = sf_mem_
 
 	free_list *fl = &seg_free_list[find_list_index_from_size(96)];
 
-	sf_snapshot();
+	//sf_snapshot();
 
 	cr_assert_not_null(fl->head, "No block in expected free list");
 	cr_assert_null(fl->head->next, "Found more blocks than expected!");
@@ -80,6 +80,7 @@ Test(sf_memsuite_student, free_coalesce, .init = sf_mem_init, .fini = sf_mem_fin
 	/* void *z = */ sf_malloc(sizeof(int));
 
 	sf_free(y);
+	//sf_snapshot();
 	sf_free(x);
 
 	free_list *fl_y = &seg_free_list[find_list_index_from_size(32)];
