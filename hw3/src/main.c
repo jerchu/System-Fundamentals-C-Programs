@@ -8,7 +8,9 @@ int main(int argc, char const *argv[]) {
 
 
 
+    sf_malloc(sizeof(double));
     double* ptr = sf_malloc(sizeof(double));
+    sf_malloc(sizeof(double));
 
     //sf_snapshot();
 
@@ -17,6 +19,7 @@ int main(int argc, char const *argv[]) {
     printf("%f\n", *ptr);
 
     sf_free(ptr);
+    //sf_snapshot();
 
     sf_mem_fini();
 

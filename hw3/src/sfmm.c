@@ -67,7 +67,7 @@ void *sf_malloc(size_t size) {
             }
         }
     }
-    int required_size = size + 32;
+    int required_size = size + 16;
     if(required_size % 16)
     {
         required_size += 16 - required_size % 16;
@@ -94,6 +94,7 @@ void *sf_malloc(size_t size) {
                         current_block->next->prev = current_block->prev;
                         current_block->next = NULL;
                     }
+                    //sf_snapshot();
                     current_block->prev = NULL;
                     allocated_block = current_block;
                     debug("Doing an insert %p", current_block);
@@ -135,9 +136,12 @@ void *sf_malloc(size_t size) {
                     int listi;
                     for(listi = 0; seg_free_list[listi].max < current_block->header.block_size * 16; listi++);
                     current_block->next = seg_free_list[listi].head;
+                    if(seg_free_list[listi].head)
+                        seg_free_list[listi].head->prev = current_block;
                     //sf_snapshot();
                     debug("current block next: %p %d", current_block->next, listi);
                     seg_free_list[listi].head = current_block;
+                    //sf_snapshot();
                     debug("blah %d", 0);
                     if(second_block != NULL) //second block exists
                     {
@@ -166,7 +170,7 @@ void *sf_malloc(size_t size) {
             }
         }
     }
-    sf_snapshot();
+    //sf_snapshot();
     if(allocated_block == NULL) //TODO: fix for sf_sbrk
     {
         sf_errno = ENOMEM;
@@ -185,7 +189,7 @@ void sf_free(void *ptr) {
     sf_footer *freed_footer = (void *)freed_header + (freed_block_size * 16 - 8);
     freed_footer->allocated = 0;
     sf_free_header *next_coalesce = (void *)freed_header + freed_header->header.block_size * 16;
-    sf_blockprint(next_coalesce);
+    //sf_blockprint(next_coalesce);
     while((void *)next_coalesce < get_heap_end() && !(next_coalesce->header.allocated)){
         //debug("end head: %p", get_heap_end());
         //debug("next_coalesce: %p", next_coalesce);
@@ -197,6 +201,7 @@ void sf_free(void *ptr) {
             int i;
             for(i = 0; seg_free_list[i].max < next_coalesce->header.block_size * 16; i++);
             seg_free_list[i].head = next_coalesce->next;
+            seg_free_list[i].head->prev = NULL;
         }
         if(next_coalesce->next != NULL){
             next_coalesce->next->prev = next_coalesce->prev;
@@ -204,7 +209,7 @@ void sf_free(void *ptr) {
         next_coalesce = (void *)next_coalesce + next_coalesce->header.block_size * 16;
     }
     if(freed_header->prev != NULL){
-        freed_header->prev->next = next_coalesce;
+        freed_header->prev->next = freed_header->next;
     }
     else{
         int i;
@@ -212,12 +217,12 @@ void sf_free(void *ptr) {
         seg_free_list[i].head = freed_header->next;
     }
     if(freed_header->next != NULL){
-        next_coalesce->prev = freed_header->prev;
+        freed_header->next->prev = freed_header->prev;
 
     }
     freed_header->next = NULL;
     freed_header->prev = NULL;
-    sf_blockprint(freed_header);
+    //sf_blockprint(freed_header);
     freed_footer = (void *)freed_header + (freed_header->header.block_size * 16 - 8);
     freed_footer->allocated = 0;
     freed_footer->block_size = freed_header->header.block_size;
@@ -226,9 +231,11 @@ void sf_free(void *ptr) {
     freed_header->next = seg_free_list[listi].head;
     //sf_snapshot();
     debug("current block next: %p %d", freed_header->next, listi);
+    if(seg_free_list[listi].head)
+        seg_free_list[listi].head->prev = freed_header;
     seg_free_list[listi].head = freed_header;
     debug("blah %d", 0);
-    sf_snapshot();
+    //sf_snapshot();
     return;
 
 }

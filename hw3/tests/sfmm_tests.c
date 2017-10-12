@@ -54,12 +54,16 @@ Test(sf_memsuite_student, free_double_free, .init = sf_mem_init, .fini = sf_mem_
 Test(sf_memsuite_student, free_no_coalesce, .init = sf_mem_init, .fini = sf_mem_fini) {
 	sf_errno = 0;
 	/* void *x = */ sf_malloc(sizeof(long));
-	void *y = sf_malloc(sizeof(double) * 10);
+	void *y = sf_malloc(sizeof(double) * 10); //80 + 16
 	/* void *z = */ sf_malloc(sizeof(char));
+
+	//sf_snapshot();
 
 	sf_free(y);
 
 	free_list *fl = &seg_free_list[find_list_index_from_size(96)];
+
+	sf_snapshot();
 
 	cr_assert_not_null(fl->head, "No block in expected free list");
 	cr_assert_null(fl->head->next, "Found more blocks than expected!");
@@ -71,8 +75,8 @@ Test(sf_memsuite_student, free_no_coalesce, .init = sf_mem_init, .fini = sf_mem_
 Test(sf_memsuite_student, free_coalesce, .init = sf_mem_init, .fini = sf_mem_fini) {
 	sf_errno = 0;
 	/* void *w = */ sf_malloc(sizeof(long));
-	void *x = sf_malloc(sizeof(double) * 11);
-	void *y = sf_malloc(sizeof(char));
+	void *x = sf_malloc(sizeof(double) * 11); //88
+	void *y = sf_malloc(sizeof(char)); //1
 	/* void *z = */ sf_malloc(sizeof(int));
 
 	sf_free(y);
@@ -80,6 +84,8 @@ Test(sf_memsuite_student, free_coalesce, .init = sf_mem_init, .fini = sf_mem_fin
 
 	free_list *fl_y = &seg_free_list[find_list_index_from_size(32)];
 	free_list *fl_x = &seg_free_list[find_list_index_from_size(144)];
+
+	//sf_snapshot();
 
 	cr_assert_null(fl_y->head, "Unexpected block in list!");
 	cr_assert_not_null(fl_x->head, "No block in expected free list");
