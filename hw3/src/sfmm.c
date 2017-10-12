@@ -85,6 +85,16 @@ void *sf_malloc(size_t size) {
             {
                 if(!(current_block->header.allocated) && current_block->header.block_size >= (required_size + 32)/16 + 1 )
                 {
+                    if(current_block->prev != NULL){
+                        current_block->prev->next = current_block->next;
+                        current_block->prev = NULL;
+                    }
+                    else
+                        seg_free_list[i].head = current_block->next;
+                    if(current_block->next != NULL){
+                        current_block->next->prev = current_block->prev;
+                        current_block->next = NULL;
+                    }
                     allocated_block = current_block;
                     debug("Doing an insert %p", current_block);
                     int second_block_size = 0;
@@ -111,9 +121,9 @@ void *sf_malloc(size_t size) {
                     sf_free_header *second_block = NULL;
                     if(second_block_size){ //old block was splintered
                         second_block = (sf_free_header *)(footer + 8); //free header of second block
-                        second_block->next = current_block->next;
+                        /*second_block->next = current_block->next;
                         current_block->next = second_block;
-                        second_block->prev = current_block;
+                        second_block->prev = current_block;*/
                         second_block->header.allocated = 0;
                         second_block->header.block_size = second_block_size;
                         sf_footer *second_footer = ((void *)second_block + (second_block->header.block_size * 16 - 8));
@@ -122,28 +132,14 @@ void *sf_malloc(size_t size) {
 
                         debug("blah %d", 0);
                     }
-                    if(seg_free_list[i].min > current_block->header.block_size * 16) //new block is less than current list
-                    {
-                        //sf_snapshot();
-                        if(current_block->prev != NULL){
-                            current_block->prev->next = current_block->next;
-                            current_block->prev = NULL;
-                        }
-                        else
-                            seg_free_list[i].head = current_block->next;
-                        if(current_block->next != NULL){
-                            current_block->next->prev = current_block->prev;
-                            current_block->next = NULL;
-                        }
-                        int listi;
-                        for(listi = 0; seg_free_list[listi].max < current_block->header.block_size * 16; listi++);
-                        current_block->next = seg_free_list[listi].head;
-                        //sf_snapshot();
-                        debug("current block next: %p %d", current_block->next, listi);
-                        seg_free_list[listi].head = current_block;
-                        debug("blah %d", 0);
-                    }
-                    if(second_block != NULL && seg_free_list[i].min > current_block->header.block_size * 16) //second block is smaller than current list
+                    int listi;
+                    for(listi = 0; seg_free_list[listi].max < current_block->header.block_size * 16; listi++);
+                    current_block->next = seg_free_list[listi].head;
+                    //sf_snapshot();
+                    debug("current block next: %p %d", current_block->next, listi);
+                    seg_free_list[listi].head = current_block;
+                    debug("blah %d", 0);
+                    if(second_block != NULL) //second block exists
                     {
                         //sf_snapshot();
                         if(second_block->prev != NULL){
@@ -156,7 +152,6 @@ void *sf_malloc(size_t size) {
                             second_block->next->prev = second_block->prev;
                             second_block->next = NULL;
                         }
-                        int listi;
                         for(listi = 0; seg_free_list[listi].max < second_block->header.block_size * 16; listi++);
                         second_block->next = seg_free_list[listi].head;
                         seg_free_list[listi].head = second_block;
@@ -185,8 +180,14 @@ void *sf_realloc(void *ptr, size_t size) {
 
 void sf_free(void *ptr) {
     sf_free_header *freed_header = ptr;
-    //int freed_block_size = 0;
+    int freed_block_size = freed_header->header.block_size;
     freed_header->header.allocated = 0;
+    sf_footer *freed_footer = (void *)freed_header + (freed_block_size * 16 - 8);
+    freed_footer->allocated = 0;
+    //sf_free_header *next_coalesce = freed_header->next;
+    //while(next_coalesce != NULL && !(next_coalesce->header.allocated)){
+
+    //}
     return;
 
 }
