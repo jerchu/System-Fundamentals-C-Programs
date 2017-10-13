@@ -98,7 +98,7 @@ void *sf_malloc(size_t size) {
                     }
                     //sf_snapshot();
                     current_block->prev = NULL;
-                    allocated_block = current_block;
+                    allocated_block = (void *)current_block + 8;
                     debug("Doing an insert %p", current_block);
                     int second_block_size = 0;
                     current_block->header.allocated = 1; //now allocated
@@ -191,9 +191,9 @@ void *sf_realloc(void *ptr, size_t size) {
         return NULL;
     }
     sf_free_header *new_block = NULL;
-    sf_free_header *realloc_header = ptr;
+    sf_free_header *realloc_header = (void *)ptr - 8;
     debug("%p %p", ptr, get_heap_start());
-    if(ptr < get_heap_start() || ptr > get_heap_end() || ptr == NULL)
+    if((void *)realloc_header < get_heap_start() || (void *)realloc_header > get_heap_end() || realloc_header == NULL)
         abort();
     if(!(realloc_header->header.allocated))
         abort();
@@ -203,18 +203,20 @@ void *sf_realloc(void *ptr, size_t size) {
         abort();
     if(!(realloc_footer->allocated) || realloc_footer->padded != realloc_header->header.padded)
         abort();
-    if(realloc_footer->requested_size + 16 != realloc_header->header.block_size && !(realloc_header->header.padded))
+    if(realloc_footer->requested_size + 16 != realloc_header->header.block_size * 16 && !(realloc_header->header.padded))
         abort();
-    if(realloc_header->header.block_size < size){
+    debug("%d %d", realloc_header->header.block_size * 16, (int)size + 16);
+    if(realloc_header->header.block_size * 16 < size + 16){
         new_block = sf_malloc(size);
         if(!new_block)
             return NULL;
-        memcpy(new_block, realloc_header, 8);
-        memcpy((void *)new_block+8, (void *)realloc_header+8, realloc_footer->requested_size);
-        memcpy((void *)new_block + (new_block->header.block_size * 16 - 8), realloc_footer, 8);
-        sf_free(realloc_header);
+        //memcpy(new_block, realloc_header, 8);
+        memcpy((void *)new_block, (void *)realloc_header, realloc_footer->requested_size);
+        //memcpy((void *)new_block + (new_block->header.block_size * 16 - 8), realloc_footer, 8);
+        sf_blockprint((void *)new_block - 8);
+        sf_free((void *)realloc_header + 8);
     }
-    else if(realloc_header->header.block_size > size){
+    else if(realloc_header->header.block_size * 16 > size + 16){
         //int block_size = realloc_header->header.block_size;
         int second_block_size = 0;
         int padding = 0;
@@ -235,13 +237,14 @@ void *sf_realloc(void *ptr, size_t size) {
         }
         realloc_header->header.block_size = required_size / 16;
         realloc_header->header.padded = padding;
-        memcpy((void *)realloc_header+8, (void *)realloc_header+8, size);
+        memcpy((void *)realloc_header, (void *)realloc_header, size);
         realloc_footer = (void *)realloc_header + required_size - 8;
         realloc_footer->allocated = 1;
         realloc_footer->padded = padding;
         realloc_footer->two_zeroes = 0;
         realloc_footer->block_size = realloc_header->header.block_size;
         realloc_footer->requested_size = size;
+        sf_blockprint(realloc_header);
         if(second_block_size){
             second_block = (void *)realloc_header + realloc_header->header.block_size * 16; //free header of second block
             /*second_block->next = current_block->next;
@@ -254,8 +257,8 @@ void *sf_realloc(void *ptr, size_t size) {
             second_footer->allocated = 1;
             second_footer->block_size = second_block_size;
             second_footer->padded = 0;
-            second_footer->requested_size = second_block_size - 16;
-            sf_free(second_block);
+            second_footer->requested_size = second_block_size*16 - 16;
+            sf_free((void *)second_block + 8);
         }
         /*if(second_block){
             int listi;
@@ -263,18 +266,18 @@ void *sf_realloc(void *ptr, size_t size) {
             second_block->next = seg_free_list[listi].head;
             seg_free_list[listi].head = second_block;
         }*/
-        new_block = realloc_header;
+        new_block = (void *)realloc_header + 8;
     }
     else{
-        new_block = realloc_header;
+        new_block = (void *)realloc_header + 8;
     }
 	return new_block;
 }
 
 void sf_free(void *ptr) {
-    sf_free_header *freed_header = ptr;
-    debug("%p %p", ptr, get_heap_start());
-    if(ptr < get_heap_start() || ptr > get_heap_end() || ptr == NULL)
+    sf_free_header *freed_header = (void *)ptr - 8;
+    debug("%p %p", (void *)freed_header, get_heap_start());
+    if((void *)freed_header < get_heap_start() || (void *)freed_header > get_heap_end() || freed_header == NULL)
         abort();
     if(!(freed_header->header.allocated))
         abort();
@@ -286,7 +289,7 @@ void sf_free(void *ptr) {
         abort();
     if(!(freed_footer->allocated) || freed_footer->padded != freed_header->header.padded)
         abort();
-    debug("%d %d", freed_footer->requested_size + 16 != freed_header->header.block_size * 16, !(freed_header->header.padded));
+    debug("%d %d %d", freed_footer->requested_size + 16, freed_header->header.block_size * 16, !(freed_header->header.padded));
     if(freed_footer->requested_size + 16 != freed_header->header.block_size * 16 && !(freed_header->header.padded))
         abort();
     freed_footer->allocated = 0;

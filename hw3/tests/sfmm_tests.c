@@ -143,6 +143,8 @@ Test(sf_memsuite_student, realloc_larger_block, .init = sf_mem_init, .fini = sf_
 	cr_assert(fl->head->header.block_size << 4 == 32, "Free Block size not what was expected!");
 
 	sf_header *header = (sf_header*)((char*)x - 8);
+	//sf_snapshot();
+	//sf_blockprint(header);
 	cr_assert(header->block_size << 4 == 64, "Realloc'ed block size not what was expected!");
 	cr_assert(header->allocated == 1, "Allocated bit is not set!");
 }
@@ -170,9 +172,12 @@ Test(sf_memsuite_student, realloc_smaller_block_free_block, .init = sf_mem_init,
 	void *x = sf_malloc(sizeof(double) * 8);
 	void *y = sf_realloc(x, sizeof(int));
 
+	sf_snapshot();
+
 	cr_assert_not_null(y, "y is NULL!");
 
 	sf_header *header = (sf_header*)((char*)y - 8);
+	sf_blockprint(header);
 	cr_assert(header->block_size << 4 == 32, "Realloc'ed block size not what was expected!");
 	cr_assert(header->allocated == 1, "Allocated bit is not set!");
 
