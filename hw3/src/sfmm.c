@@ -28,6 +28,7 @@ int sf_errno = 0;
 // do the page call and coalese!!!!!!!
 
 void *sf_malloc(size_t size) {
+    sf_errno = 0;
     int padding = 0;
     if(size == 0 || size > PAGE_SZ * 4)
     {
@@ -85,7 +86,8 @@ void *sf_malloc(size_t size) {
             //debug("%d %p", i, current_block);
             while(current_block != NULL)
             {
-                if(!(current_block->header.allocated) && current_block->header.block_size >= (required_size + 32)/16 + 1 )
+                //printf("%d %d\n", current_block->header.block_size, (required_size)/16);
+                if(!(current_block->header.allocated) && current_block->header.block_size >= (required_size)/16)
                 {
                     if(current_block->prev != NULL){
                         current_block->prev->next = current_block->next;
@@ -215,7 +217,7 @@ void *sf_malloc(size_t size) {
                 }
                 prev_coalesce = (void *)prev_coalesce - ((sf_footer *)((void *)prev_coalesce - 8))->block_size * 16;
             }
-            sf_blockprint(start_page);
+            //sf_blockprint(start_page);
             start_page->header.allocated = 0;
             sf_footer *end_page = (sf_footer *)(get_heap_end() - 8);
             end_page->allocated = 0;
@@ -227,7 +229,7 @@ void *sf_malloc(size_t size) {
             if(seg_free_list[listi].head)
                 seg_free_list[listi].head->prev = start_page;
             seg_free_list[listi].head = start_page;
-            sf_snapshot();
+            //sf_snapshot();
             return sf_malloc(size);
         }
     }
@@ -255,6 +257,10 @@ void *sf_realloc(void *ptr, size_t size) {
         abort();
     if(realloc_footer->requested_size + 16 != realloc_header->header.block_size * 16 && !(realloc_header->header.padded))
         abort();
+    if(realloc_footer->requested_size + 16 > realloc_header->header.block_size * 16)
+        abort();
+    if(realloc_footer->requested_size + 16 == realloc_header->header.block_size * 16 && realloc_header->header.padded)
+        abort();
     debug("%d %d", realloc_header->header.block_size * 16, (int)size + 16);
     int required_size = size + 16;
     int padding = 0;
@@ -270,7 +276,7 @@ void *sf_realloc(void *ptr, size_t size) {
         //memcpy(new_block, realloc_header, 8);
         memcpy((void *)new_block, (void *)realloc_header, realloc_footer->requested_size);
         //memcpy((void *)new_block + (new_block->header.block_size * 16 - 8), realloc_footer, 8);
-        sf_blockprint((void *)new_block - 8);
+        //sf_blockprint((void *)new_block - 8);
         sf_free((void *)realloc_header + 8);
     }
     else if(realloc_header->header.block_size * 16 > size + 16){
@@ -294,7 +300,7 @@ void *sf_realloc(void *ptr, size_t size) {
         realloc_footer->two_zeroes = 0;
         realloc_footer->block_size = realloc_header->header.block_size;
         realloc_footer->requested_size = size;
-        sf_blockprint(realloc_header);
+        //sf_blockprint(realloc_header);
         if(second_block_size){
             second_block = (void *)realloc_header + realloc_header->header.block_size * 16; //free header of second block
             /*second_block->next = current_block->next;
@@ -341,6 +347,10 @@ void sf_free(void *ptr) {
         abort();
     debug("%d %d %d", freed_footer->requested_size + 16, freed_header->header.block_size * 16, !(freed_header->header.padded));
     if(freed_footer->requested_size + 16 != freed_header->header.block_size * 16 && !(freed_header->header.padded))
+        abort();
+    if(freed_footer->requested_size + 16 > freed_header->header.block_size * 16)
+        abort();
+    if(freed_footer->requested_size + 16 == freed_header->header.block_size * 16 && freed_header->header.padded)
         abort();
     freed_footer->allocated = 0;
     sf_free_header *next_coalesce = (void *)freed_header + freed_header->header.block_size * 16;

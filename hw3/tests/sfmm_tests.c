@@ -172,12 +172,12 @@ Test(sf_memsuite_student, realloc_smaller_block_free_block, .init = sf_mem_init,
 	void *x = sf_malloc(sizeof(double) * 8);
 	void *y = sf_realloc(x, sizeof(int));
 
-	sf_snapshot();
+	//sf_snapshot();
 
 	cr_assert_not_null(y, "y is NULL!");
 
 	sf_header *header = (sf_header*)((char*)y - 8);
-	sf_blockprint(header);
+	//sf_blockprint(header);
 	cr_assert(header->block_size << 4 == 32, "Realloc'ed block size not what was expected!");
 	cr_assert(header->allocated == 1, "Allocated bit is not set!");
 
@@ -197,3 +197,76 @@ Test(sf_memsuite_student, realloc_smaller_block_free_block, .init = sf_mem_init,
 //DO NOT DELETE THESE COMMENTS
 //############################################
 
+Test(sf_memsuite_student, malloc_one_page, .init = sf_mem_init, .fini = sf_mem_fini) {
+	void *x = sf_malloc(4080);
+
+	//sf_snapshot();
+	//sf_blockprint(x - 8);
+
+	free_list *fl = &seg_free_list[find_list_index_from_size(PAGE_SZ - 16)];
+
+	sf_free_header *header = x - 8;
+
+	cr_assert_null(fl->head, "Unexpected block in free list");
+	cr_assert(header->header.block_size << 4 == 4096, "Block size is incorrect");
+}
+
+Test(sf_memsuite_student, realloc_free_zero_size, .init = sf_mem_init, .fini = sf_mem_fini) {
+	void *x = sf_malloc(sizeof(double));
+	sf_malloc(sizeof(double));
+
+	x = sf_realloc(x, 0);
+
+	free_list *fl = &seg_free_list[find_list_index_from_size(32)];
+
+	cr_assert_not_null(fl->head, "No block in expected free list!");
+	cr_assert_null(x, "Block is not null");
+}
+
+Test(sf_memsuite_student, malloc_four_page_success, .init = sf_mem_init, .fini = sf_mem_fini) {
+	/*void *x =*/ sf_malloc(sizeof(double));
+	void *y = sf_malloc(PAGE_SZ * 3);
+
+	free_list *fl = &seg_free_list[find_list_index_from_size(PAGE_SZ)];
+
+	cr_assert_not_null(fl->head, "No block in expected free list!");
+	sf_free_header *header = y - 8;
+	cr_assert(header->header.block_size << 4 == PAGE_SZ * 3 + 16, "Block_size is wrong");
+}
+
+Test(sf_memsuite_student, free_list_correct_order, .init = sf_mem_init, .fini = sf_mem_fini) {
+	void *x = sf_malloc(sizeof(double));
+	void *y = sf_malloc(sizeof(double) * 4);
+	void *z = sf_malloc(sizeof(double) * 8);
+	sf_malloc(sizeof(double));
+
+	//sf_blockprint(z - 8);
+
+	sf_free(x);
+	sf_free(y);
+	//sf_snapshot();
+	sf_free(z);
+	//sf_snapshot();
+
+	free_list *fl = &seg_free_list[find_list_index_from_size(32)];
+
+	cr_assert_not_null(fl->head, "No block in expected free list!");
+	cr_assert_not_null(fl->head->next, "No block after head");
+	cr_assert_not_null(fl->head->next->next, "No block after next");
+}
+
+Test(sf_memsuite_student, malloc_invalid_values, .init = sf_mem_init, .fini = sf_mem_fini) {
+	sf_errno = 0;
+
+	void *x = sf_malloc(0);
+
+	cr_assert_null(x, "malloc was not null");
+	cr_assert(sf_errno == EINVAL, "errno is incorrect");
+
+	sf_errno = 0;
+
+	x = sf_malloc(PAGE_SZ * 4 + 1);
+
+	cr_assert_null(x, "malloc was not null");
+	cr_assert(sf_errno == EINVAL, "errno is incorrect");
+}
