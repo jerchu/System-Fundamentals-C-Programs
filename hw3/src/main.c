@@ -8,27 +8,25 @@ int main(int argc, char const *argv[]) {
 
 
 
-    /*sf_malloc(sizeof(long));
-    double* ptr = sf_malloc(sizeof(double)*10);
+    //sf_malloc(sizeof(long));
+    //double* ptr = sf_malloc(sizeof(double));
+    double* next_page = sf_malloc(PAGE_SZ * 4);
     //double* ptr1 = sf_malloc(sizeof(double));
-    sf_malloc(sizeof(char));*/
+    //sf_malloc(sizeof(char));
 
-    void *x = sf_malloc(sizeof(double) * 8);
-    void *y = sf_realloc(x, sizeof(int));
-    //y = y;
+    sf_snapshot();
 
-    //sf_snapshot();
+    //*ptr = 1.337;//320320320e-320;
 
-    //*ptr = 320320320e-320;
+    //printf("%1.3f\n", *ptr);
 
-    //printf("%f\n", *ptr);
-
-    sf_blockprint((void *)y - 8);
+    //sf_blockprint((void *)y - 8);
 
     //sf_free(ptr1);
     //sf_snapshot();
-    //sf_free(ptr);
-    //sf_snapshot();
+    sf_free(next_page);
+    //sf_realloc(ptr, 0);
+    sf_snapshot();
 
     sf_mem_fini();
 
