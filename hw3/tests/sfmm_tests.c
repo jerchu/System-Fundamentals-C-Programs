@@ -270,3 +270,36 @@ Test(sf_memsuite_student, malloc_invalid_values, .init = sf_mem_init, .fini = sf
 	cr_assert_null(x, "malloc was not null");
 	cr_assert(sf_errno == EINVAL, "errno is incorrect");
 }
+
+Test(sf_memsuite_student, mix_of_requests, .init = sf_mem_init, .fini = sf_mem_fini) {
+	sf_errno=0;
+	void* a=sf_malloc(7000); // will return block of size 7024 after 2 calls to sbrk
+	void* b=sf_malloc(10);
+	void* c=sf_malloc(34);
+	void*d=sf_malloc(1000);
+	sf_free(b);
+	c=sf_realloc(c, 300);
+	void*e=sf_malloc(20);
+	void *f=sf_malloc(80);
+	sf_free(e);
+	sf_free(c);
+	d=sf_realloc(d, 12000);
+	sf_free(a);
+	void*g=sf_malloc(100);
+	sf_realloc(g, 2000);
+
+	sf_free(f);
+	void*h=sf_malloc(400);
+	void*i=sf_malloc(23);
+	void*j=sf_malloc(230);
+	void*k=sf_malloc(12);
+	sf_free(j);
+	sf_free(h);
+	sf_free(i);
+	sf_realloc(k, 40);
+	void*l=sf_malloc(1000);
+	void*m=sf_malloc(4000);
+	sf_free(m);
+	sf_free(l);
+
+}
