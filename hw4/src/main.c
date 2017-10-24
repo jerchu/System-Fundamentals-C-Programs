@@ -1,14 +1,43 @@
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
 #include <readline/readline.h>
+#include <signal.h>
 
 #include "sfish.h"
 #include "debug.h"
 
+typedef struct ArgStruct ArgStruct;
+
+struct ArgStruct{
+    char *currarg;
+    ArgStruct *nextarg;
+};
+
+sigset_t mask, prev;
+char currentDir[256];
+char prevDir[256] = {0};
+
+int execute(const char *pathname, char *vargs[]);
+
+void sigchld_handler(int s)
+{
+    int olderrno = errno;
+    pid_t pid = wait(NULL);
+    pid = pid;
+    errno = olderrno;
+}
+
 int main(int argc, char *argv[], char* envp[]) {
+    signal(SIGCHLD, sigchld_handler);
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
     char* input;
     bool exited = false;
 
@@ -22,8 +51,6 @@ int main(int argc, char *argv[], char* envp[]) {
         }
     }
     char prompt[256] = {0};
-    char currentDir[256];
-    char prevDir[256] = {0};
     getcwd(currentDir, 256 - strlen(" :: jerchu >>"));
     char *home = getenv("HOME");
 
@@ -123,7 +150,40 @@ int main(int argc, char *argv[], char* envp[]) {
             printf("%s\n", currentDir);
         }
         else if(!exited){
-            printf(EXEC_NOT_FOUND, input);
+            //ArgStruct *args;
+            char *currarg = strtok(input, " ");
+            //args->nextarg = NULL;
+            if(currarg != NULL && strstr(currarg, "/") != NULL){
+                struct stat *stt = NULL;
+                int success = stat(currarg, stt);
+                if(success){
+                    if(strstr(currarg, "./") == currarg){
+                        currarg += 2;
+                    }
+                    //ArgStruct *argshead = args;
+                    int counter = 0;
+                    char **argv = malloc(sizeof(char *));
+                    argv[counter] = currarg;
+                    counter++;
+                    while((currarg = strtok(NULL, " ")) != NULL){
+                        /*ArgStruct *nextarg;
+                        nextarg->currarg = strtok(NULL, " ");
+                        nextarg->nextarg = NULL;
+                        args->nextarg = nextarg;
+                        args = nextarg;*/
+                        argv = realloc(argv, sizeof(char *) * (counter + 1));
+                        argv[counter] = currarg;
+                        counter++;
+                    }
+                    argv = realloc(argv, sizeof(char *) * (counter + 1));
+                    argv[counter] = NULL;
+                    execute(argv[0], argv);
+                    debug("did the thing %d\n", 0);
+                }
+            }
+            else{
+                printf(EXEC_NOT_FOUND, input);
+            }
         }
 
         // Readline mallocs the space for input. You must free it.
@@ -133,5 +193,26 @@ int main(int argc, char *argv[], char* envp[]) {
 
     debug("%s", "user entered 'exit'");
 
+    return EXIT_SUCCESS;
+}
+
+int execute(const char *pathname, char *vargs[]){
+    sigprocmask(SIG_BLOCK, &mask, &prev);
+    if(fork() == 0){
+        sigprocmask(SIG_SETMASK, &prev, NULL);
+        char execpath[256] = {0};
+        if(strstr(pathname, "/") == pathname)
+            strcat(execpath, pathname);
+        else
+            strcat(strcat(strcat(execpath, currentDir), "/"), pathname);
+        int error = execv(pathname, vargs);
+        if(error == -1)
+            debug("%d, %d\n", error, errno);
+        exit(EXIT_SUCCESS);
+    }
+    sigsuspend(&prev);
+    //for now just reap the child
+    sigprocmask(SIG_SETMASK, &prev, NULL);
+    //wait(NULL);
     return EXIT_SUCCESS;
 }
