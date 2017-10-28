@@ -25,6 +25,7 @@ char currentDir[256];
 char prevDir[256] = {0};
 
 int execute(const char *pathname, char *vargs[]);
+int prepexecute(char *currarg, char *inputptr);
 
 void sigchld_handler(int s)
 {
@@ -51,7 +52,7 @@ int main(int argc, char *argv[], char* envp[]) {
         }
     }
     char prompt[256] = {0};
-    getcwd(currentDir, 256 - strlen(" :: jerchu >>"));
+    getcwd(currentDir, 256 - strlen(" :: jerchu >> "));
     char *home = getenv("HOME");
 
     do {
@@ -86,16 +87,19 @@ int main(int argc, char *argv[], char* envp[]) {
             printf("Available Commands:\n"
                 "help: prints this helpful menu :)\n"
                 "cd [dir]: changes the current working directory\n"
-                "pwd: prints the current working directory\n");
+                "pwd: prints the current working directory\n"
+                "exit: closes the shell\n");
         }
         else if(strstr(input, "cd") != NULL) {
             char *tempinput = calloc(strlen(input), 1);
             tempinput = strcpy(tempinput, input);
-            char *tokinput = strtok(input, " ");
+            char *inputptr;
+            char *tokinput = strtok_r(input, " ", &inputptr);
             //if(strcmp(tokinput, "cd"))
                 //printf(EXEC_NOT_FOUND, input);
-            tokinput = strtok(NULL, " ");
+            tokinput = strtok_r(NULL, " ", &inputptr);
             if(tokinput == NULL){
+                memset(prevDir, 0, 256);
                 strcpy(prevDir, currentDir);
                 strcpy(currentDir, home);
                 chdir(currentDir);
@@ -107,6 +111,7 @@ int main(int argc, char *argv[], char* envp[]) {
                     strcpy(currentDir, prevDir);
                     strcpy(prevDir, tempDir);
                     chdir(currentDir);
+                    printf("%s\n", currentDir);
                 }
                 else{
                     printf("No previous directory\n");
@@ -128,6 +133,8 @@ int main(int argc, char *argv[], char* envp[]) {
                     for(;*tokinput && *tokinput != '/'; tokinput++);
                     if(*tokinput == '/'){tokinput++;}
                 }
+                memset(prevDir, 0, 256);
+                strcpy(prevDir, currentDir);
                 memset(currentDir, 0, 256);
                 getcwd(currentDir, 256);
                 if(*tokinput){
@@ -136,6 +143,8 @@ int main(int argc, char *argv[], char* envp[]) {
                     strcat(newdir, tokinput);
                     int success = chdir(newdir);
                     if(success > -1){
+                        memset(prevDir, 0, 256);
+                        strcpy(prevDir, currentDir);
                         memset(currentDir, 0, 256);
                         getcwd(currentDir, 256);
                     }
@@ -151,37 +160,48 @@ int main(int argc, char *argv[], char* envp[]) {
         }
         else if(!exited){
             //ArgStruct *args;
-            char *currarg = strtok(input, " ");
+            char *inputptr;
+            char *currarg = strtok_r(input, " ", &inputptr);
             //args->nextarg = NULL;
+            struct stat stt;
             if(currarg != NULL && strstr(currarg, "/") != NULL){
-                struct stat *stt = NULL;
-                int success = stat(currarg, stt);
-                if(success){
-                    if(strstr(currarg, "./") == currarg){
-                        currarg += 2;
-                    }
-                    //ArgStruct *argshead = args;
-                    int counter = 0;
-                    char **argv = malloc(sizeof(char *));
-                    argv[counter] = currarg;
-                    counter++;
-                    while((currarg = strtok(NULL, " ")) != NULL){
-                        /*ArgStruct *nextarg;
-                        nextarg->currarg = strtok(NULL, " ");
-                        nextarg->nextarg = NULL;
-                        args->nextarg = nextarg;
-                        args = nextarg;*/
-                        argv = realloc(argv, sizeof(char *) * (counter + 1));
-                        argv[counter] = currarg;
-                        counter++;
-                    }
-                    argv = realloc(argv, sizeof(char *) * (counter + 1));
-                    argv[counter] = NULL;
-                    execute(argv[0], argv);
-                    debug("did the thing %d\n", 0);
+                //debug("trying relative/absolute path %d", 0);
+                int success = stat(currarg, &stt);
+                if(!success){
+                    prepexecute(currarg, inputptr);
                 }
             }
+            else if(currarg != NULL){
+                char path[] = {0};
+                strcat(path, getenv("PATH"));
+                char *pathptr;
+                char *pathtok = strtok_r(path, ":", &pathptr);
+                char execpath[256] = {0};
+                strcat(strcat(strcat(execpath, pathtok), "/"), currarg);
+                //debug("current exec path: %s\n", execpath);
+                int success = stat(execpath, &stt);
+                //debug("success: %d %d\n", success, errno);
+                while(success && pathtok != NULL){
+                    pathtok = strtok_r(NULL, ":", &pathptr);
+                    if(pathtok == NULL)
+                        break;
+                    memset(execpath, 0, 256);
+                    strcat(strcat(strcat(execpath, pathtok), "/"), currarg);
+                    //debug("current exec path: %s\n", execpath);
+                    success = stat(execpath, &stt);
+                    //debug("success: %d %d\n", success, errno);
+                }
+                if(!success){
+                    //debug("exec path: %s\n", execpath);
+                    prepexecute(execpath, inputptr);
+                }
+                else{
+                    printf(EXEC_NOT_FOUND, input);
+                }
+
+            }
             else{
+                debug("printing else case %d", 0);
                 printf(EXEC_NOT_FOUND, input);
             }
         }
@@ -193,6 +213,32 @@ int main(int argc, char *argv[], char* envp[]) {
 
     debug("%s", "user entered 'exit'");
 
+    return EXIT_SUCCESS;
+}
+
+int prepexecute(char *currarg, char *inputptr){
+    if(strstr(currarg, "./") == currarg){
+        currarg += 2;
+    }
+    //ArgStruct *argshead = args;
+    int counter = 0;
+    char **argv = malloc(sizeof(char *));
+    argv[counter] = currarg;
+    counter++;
+    while((currarg = strtok_r(NULL, " ", &inputptr)) != NULL){
+        /*ArgStruct *nextarg;
+        nextarg->currarg = strtok(NULL, " ");
+        nextarg->nextarg = NULL;
+        args->nextarg = nextarg;
+        args = nextarg;*/
+        argv = realloc(argv, sizeof(char *) * (counter + 1));
+        argv[counter] = currarg;
+        counter++;
+    }
+    argv = realloc(argv, sizeof(char *) * (counter + 1));
+    argv[counter] = NULL;
+    execute(argv[0], argv);
+    debug("did the thing %d\n", 0);
     return EXIT_SUCCESS;
 }
 
