@@ -106,14 +106,14 @@ int main(int argc, char *argv[], char* envp[]) {
 
         // You should change exit to a "builtin" for your hw.
         exited = strcmp(input, "exit") == 0;
-        if(strcmp(input, "help") == 0){
+        /*if(strcmp(input, "help") == 0){
             printf("Available Commands:\n"
                 "help: prints this helpful menu :)\n"
                 "cd [dir]: changes the current working directory\n"
                 "pwd: prints the current working directory\n"
                 "exit: closes the shell\n");
-        }
-        else if(strstr(input, "cd") != NULL) {
+        }*/
+/*else*/if(strstr(input, "cd") != NULL) {
             char *tempinput = calloc(strlen(input), 1);
             tempinput = strcpy(tempinput, input);
             char *inputptr;
@@ -180,9 +180,9 @@ int main(int argc, char *argv[], char* envp[]) {
                 //printf(EXEC_NOT_FOUND, input);
             }
         }
-        else if(strstr(input, "pwd") == input){
+        /*else if(strstr(input, "pwd") == input){
             printf("%s\n", currentDir);
-        }
+        }*/
         else if(!exited){
             char *token;
             //ExecStruct **exec = calloc(1, sizeof(ExecStruct))
@@ -232,7 +232,13 @@ int findexecutable(char *input){
     char *currarg = strtok_r(input, " ", &inputptr);
     //args->nextarg = NULL;
     struct stat stt;
-    if(currarg != NULL && strstr(currarg, "/") != NULL){
+    if(currarg != NULL && strcmp(currarg, "pwd") == 0){
+        execute("pwd", NULL);
+    }
+    else if(currarg!=NULL && strcmp(currarg, "help") == 0){
+        execute("help", NULL);
+    }
+    else if(currarg != NULL && strstr(currarg, "/") != NULL){
         debug("trying relative/absolute path %d", 0);
         int success = stat(currarg, &stt);
         if(!success){
@@ -376,6 +382,18 @@ int execute(const char *pathname, char *vargs[]){
         //close(pipefd1[1]);
         //close(pipefd2[0]);
         //close(pipefd2[1]);
+        if(strcmp(pathname, "pwd")==0 && vargs == NULL){
+            printf("%s\n", currentDir);
+            exitfork(EXIT_SUCCESS, inputfd, outputfd);
+        }
+        else if(strcmp(pathname, "help")==0 && vargs == NULL){
+            printf("Available Commands:\n"
+                "help: prints this helpful menu :)\n"
+                "cd [dir]: changes the current working directory\n"
+                "pwd: prints the current working directory\n"
+                "exit: closes the shell\n");
+            exitfork(EXIT_SUCCESS, inputfd, outputfd);
+        }
         char execpath[256] = {0};
         if(strstr(pathname, "/") == pathname)
             strcat(execpath, pathname);
