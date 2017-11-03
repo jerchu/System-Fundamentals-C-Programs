@@ -36,6 +36,7 @@ int pipefd1[2] = {-1, -1};
 int pipefd2[2] = {-1 ,-1};
 char *outpos;
 char *inpos;
+char *color = ANSI_COLOR_RESET;
 JobStruct *joblist;
 struct termios shell_tmodes;
 
@@ -103,7 +104,9 @@ int main(int argc, char *argv[], char* envp[]) {
         }
         else
             strcat(strcat(prompt, currentDir), " :: jerchu >> ");
-        input = readline(prompt);
+        char colorprompt[1000] = {0};
+        strcat(strcat(strcat(colorprompt, color), prompt), ANSI_COLOR_RESET);
+        input = readline(colorprompt);
 
         /*write(1, "\e[s", strlen("\e[s"));
         write(1, "\e[20;10H", strlen("\e[20;10H"));
@@ -244,8 +247,15 @@ int main(int argc, char *argv[], char* envp[]) {
                     debug("%s", "not stuck at proc mask");
                 }
                 else{
-                    printf("no job %s\n", tok + 1);
+                    char errstr[1000] = {0};
+                    sprintf(errstr, "fg: no job %d", jpid);
+                    printf(BUILTIN_ERROR, errstr);
                 }
+            }
+            else{
+                char errstr[1000] = {0};
+                sprintf(errstr, "fg: %d is not a valid job", jpid);
+                printf(BUILTIN_ERROR, errstr);
             }
         }
         else if(strstr(input, "kill")>0){
@@ -254,26 +264,37 @@ int main(int argc, char *argv[], char* envp[]) {
             char *tok = strtok_r(NULL, " ", &inputptr);
             pid_t jpid = -1;
             JobStruct *job = NULL;
-            if(tok != NULL && tok[0] == '%' && strspn(tok+1, "0123456789") == strlen(tok+1)){
-                jpid = atoi(tok+1);
-                job = joblist->next;
-                for(pid_t i = 1; i != jpid && job; job = job->next, i++);
-                if(job)
-                    jpid = job->pid;
+            debug("%zd, %zd", strspn(tok+1, "0123456789"), strlen(tok+1));
+            if(tok != NULL && tok[0] == '%'){
+                if(strspn(tok+1, "0123456789") == strlen(tok+1)){
+                    jpid = atoi(tok+1);
+                    job = joblist->next;
+                    for(pid_t i = 1; i != jpid && job; job = job->next, i++);
+                    if(job)
+                        jpid = job->pid;
+                }
             }
-            else if(tok != NULL && strspn(tok, "0123456789") == strlen(tok)){
-                jpid = atoi(tok);
-                job = joblist->next;
-                for(;jpid != job->pid && job; job = job->next);
+            else if(tok != NULL){
+                if(strspn(tok, "0123456789") == strlen(tok)){
+                    jpid = atoi(tok);
+                    job = joblist->next;
+                    for(;jpid != job->pid && job; job = job->next);
+                }
             }
             int error;
             if(job)
                 error = killpg(getpgid(jpid), SIGKILL);
-            else
+            else if(jpid > -1){
                 error = kill(jpid, SIGKILL);
+            }
+            else{
+                char errstr[1000] = {0};
+                sprintf(errstr, "kill: there was a problem killing process %s", tok);
+                printf(BUILTIN_ERROR, errstr);
+            }
             if(error < 0){
                 char errstr[1000] = {0};
-                sprintf(errstr, "kill: there was a problem killing process %s\n", tok);
+                sprintf(errstr, "kill: there was a problem killing process %s", tok);
                 printf(BUILTIN_ERROR, errstr);
             }
             else{
@@ -284,6 +305,29 @@ int main(int argc, char *argv[], char* envp[]) {
                     free(job);
                 }
             }
+        }
+        else if(strstr(input, "color")>0){
+            char *inputptr;
+            strtok_r(input, " ", &inputptr);
+            char *tok = strtok_r(NULL, " ", &inputptr);
+            if(strcmp(tok, "RED")==0)
+                color = ANSI_COLOR_RED;
+            else if(strcmp(tok, "GRN")==0)
+                color = ANSI_COLOR_GREEN;
+            else if(strcmp(tok, "YEL")==0)
+                color = ANSI_COLOR_YELLOW;
+            else if(strcmp(tok, "BLU")==0)
+                color = ANSI_COLOR_BLUE;
+            else if(strcmp(tok, "MAG")==0)
+                color = ANSI_COLOR_MAGENTA;
+            else if(strcmp(tok, "CYN")==0)
+                color = ANSI_COLOR_CYAN;
+            else if(strcmp(tok, "WHT")==0)
+                color = ANSI_COLOR_WHITE;
+            else if(strcmp(tok, "BWN")==0)
+                color = ANSI_COLOR_BROWN;
+            else
+                printf(BUILTIN_ERROR, "invalid color");
         }
         /*else if(strstr(input, "pwd") == input){
             printf("%s\n", currentDir);
@@ -327,6 +371,10 @@ int main(int argc, char *argv[], char* envp[]) {
             signal(SIGTTOU, SIG_IGN);
             while(!pid)
                 sigsuspend(&prev);
+            /*if(WIFEXITED(status)){
+                if(WEXITSTATUS(status)==EXIT_FAILURE)
+                    printf(EXEC_ERROR, "process failed to execute");
+            }*/
             debug("%d", tcgetpgrp(0));
             if(WIFSTOPPED(status))
                 tcgetattr(STDIN_FILENO, &job->tmodes);
@@ -397,6 +445,11 @@ int findexecutable(char *input){
         if(!success){
             prepexecute(currarg, currarg, inputptr);
         }
+        else{
+            char errstr[1000] = {0};
+            sprintf(errstr, "%s: command not found", currarg);
+            printf(EXEC_ERROR, errstr);
+        }
     }
     else if(currarg != NULL){
         char *path = malloc(strlen(getenv("PATH")));
@@ -426,13 +479,17 @@ int findexecutable(char *input){
             prepexecute(execpath, currarg, inputptr);
         }
         else{
-            printf(EXEC_NOT_FOUND, input);
+            char errstr[1000] = {0};
+            sprintf(errstr, "%s: command not found", currarg);
+            printf(EXEC_ERROR, errstr);
         }
         free(path);
     }
     else{
         debug("printing else case %d", 0);
-        printf(EXEC_NOT_FOUND, input);
+        char errstr[1000] = {0};
+        sprintf(errstr, "%s: command not found", currarg);
+        printf(EXEC_ERROR, errstr);
     }
     return EXIT_SUCCESS;
 }
@@ -514,6 +571,10 @@ int execute(const char *pathname, char *vargs[]){
                 exitfork(EXIT_FAILURE, inputfd, outputfd);
             }
         }
+        else if(inpos > 0 && inputfd >= 0){
+            printf(SYNTAX_ERROR, "redirection < cannot be used after a pipeline");
+            exitfork(EXIT_FAILURE, inputfd, outputfd);
+        }
         if(outpos > 0 && outputfd < 0){
             debug("%s", outpos);
             outpos = trimwhitespace(outpos);
@@ -524,6 +585,10 @@ int execute(const char *pathname, char *vargs[]){
                 printf(SYNTAX_ERROR, "invalid file name");
                 exitfork(EXIT_FAILURE, inputfd, outputfd);
             }
+        }
+        else if(outpos > 0 && outputfd >= 0){
+            printf(SYNTAX_ERROR, "redirection > cannot be used before a pipeline");
+            exitfork(EXIT_FAILURE, inputfd, outputfd);
         }
         //debug("%d", redirection);
         if(inputfd >= 0){
@@ -551,6 +616,8 @@ int execute(const char *pathname, char *vargs[]){
                 "help: prints this helpful menu :)\n"
                 "cd [dir]: changes the current working directory\n"
                 "pwd: prints the current working directory\n"
+                "fg %%jid: continues the process %%jid\n"
+                "kill %%jid | pid: kill the process with %%jid or pid\n"
                 "exit: closes the shell\n");
             exitfork(EXIT_SUCCESS, inputfd, outputfd);
         }
@@ -565,10 +632,14 @@ int execute(const char *pathname, char *vargs[]){
         if((childpid = fork()) == 0){
             //sigprocmask(SIG_SETMASK, &prev, NULL);
             execv(pathname, vargs);
-            exit(EXIT_SUCCESS);
+            exit(EXIT_FAILURE);
         }
         while(childpid != pid)
             sigsuspend(&prev);
+        if(WIFEXITED(status)){
+            if(WEXITSTATUS(status) == EXIT_FAILURE)
+                exit(EXIT_FAILURE);
+        }
         close(pipefd1[0]);
         //close(pipefd1[1]);
         //close(pipefd2[0]);
@@ -594,6 +665,9 @@ int execute(const char *pathname, char *vargs[]){
                     putchar(c);
             }
         }
+        else if(inpos > 0 && inputfd >= 0){
+            printf(SYNTAX_ERROR, "redirection < cannot be used after a pipeline");
+        }
         exitfork(EXIT_SUCCESS, inputfd, outputfd);
     }
     else{
@@ -613,8 +687,13 @@ int execute(const char *pathname, char *vargs[]){
     }
     else{
         sigprocmask(SIG_BLOCK, &mask, &prev);
-        while(childpid != pid)
+        while(childpid != pid){
             sigsuspend(&prev);
+            if(WIFEXITED(status)){
+                if(WEXITSTATUS(status) == EXIT_FAILURE)
+                    exit(EXIT_FAILURE);
+            }
+        }
         sigprocmask(SIG_SETMASK, &prev, NULL);
     }
     //for now just reap the child
