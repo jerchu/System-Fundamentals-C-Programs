@@ -105,10 +105,10 @@ int main(int argc, char *argv[], char* envp[]) {
             strcat(strcat(prompt, currentDir), " :: jerchu >> ");
         input = readline(prompt);
 
-        write(1, "\e[s", strlen("\e[s"));
+        /*write(1, "\e[s", strlen("\e[s"));
         write(1, "\e[20;10H", strlen("\e[20;10H"));
         write(1, "SomeText", strlen("SomeText"));
-        write(1, "\e[u", strlen("\e[u"));
+        write(1, "\e[u", strlen("\e[u"));*/
 
         // If EOF is read (aka ^D) readline returns NULL
         if(input == NULL) {
@@ -153,7 +153,7 @@ int main(int argc, char *argv[], char* envp[]) {
                     strcpy(currentDir, prevDir);
                     strcpy(prevDir, tempDir);
                     chdir(currentDir);
-                    printf("%s\n", currentDir);
+                    //printf("%s\n", currentDir);
                 }
                 else{
                     printf(BUILTIN_ERROR, "cd: No previous directory");
@@ -209,7 +209,7 @@ int main(int argc, char *argv[], char* envp[]) {
             strtok_r(input, " ", &inputptr);
             char *tok = strtok_r(NULL, " ", &inputptr);
             pid_t jpid;
-            if(tok != NULL && tok[0] == '%'){
+            if(tok != NULL && tok[0] == '%' && strspn(tok+1, "0123456789") == strlen(tok+1)){
                 jpid = atoi(tok+1);
                 JobStruct *job = joblist->next;
                 for(pid_t i = 1; i != jpid && job; job = job->next, i++);
@@ -248,15 +248,52 @@ int main(int argc, char *argv[], char* envp[]) {
                 }
             }
         }
+        else if(strstr(input, "kill")>0){
+            char *inputptr;
+            strtok_r(input, " ", &inputptr);
+            char *tok = strtok_r(NULL, " ", &inputptr);
+            pid_t jpid = -1;
+            JobStruct *job = NULL;
+            if(tok != NULL && tok[0] == '%' && strspn(tok+1, "0123456789") == strlen(tok+1)){
+                jpid = atoi(tok+1);
+                job = joblist->next;
+                for(pid_t i = 1; i != jpid && job; job = job->next, i++);
+                if(job)
+                    jpid = job->pid;
+            }
+            else if(tok != NULL && strspn(tok, "0123456789") == strlen(tok)){
+                jpid = atoi(tok);
+                job = joblist->next;
+                for(;jpid != job->pid && job; job = job->next);
+            }
+            int error;
+            if(job)
+                error = killpg(getpgid(jpid), SIGKILL);
+            else
+                error = kill(jpid, SIGKILL);
+            if(error < 0){
+                char errstr[1000] = {0};
+                sprintf(errstr, "kill: there was a problem killing process %s\n", tok);
+                printf(BUILTIN_ERROR, errstr);
+            }
+            else{
+                if(job){
+                    job->prev->next = job->next;
+                    if(job->next)
+                        job->next->prev = job->prev;
+                    free(job);
+                }
+            }
+        }
         /*else if(strstr(input, "pwd") == input){
             printf("%s\n", currentDir);
         }*/
         else if(!exited){
             char *token;
             //ExecStruct **exec = calloc(1, sizeof(ExecStruct))
-            char *name = malloc(25);
-            strncpy(name, input, 22);
-            if(strlen(name) > 21)
+            char *name = malloc(50);
+            strncpy(name, input, 47);
+            if(strlen(name) > 46)
                 strcat(name, "...");
             JobStruct *job = malloc(sizeof(JobStruct));
             job->execname = name;
@@ -447,7 +484,6 @@ int checkredirection(char *currarg)
 }
 
 int execute(const char *pathname, char *vargs[]){
-    sigprocmask(SIG_BLOCK, &mask, &prev);
     pid = 0;
     char *token = strtok_r(NULL, "|", &tokptr);
     debug("%d, %d", pipefd1[0], pipefd1[1]);
@@ -455,10 +491,6 @@ int execute(const char *pathname, char *vargs[]){
         pipe(pipefd2);
         debug("%d, %d", pipefd2[0], pipefd2[1]);
     }
-    //close(pipefd1[0]);
-    //close(pipefd1[1]);
-    //close(pipefd2[0]);
-    close(pipefd2[1]);
     if((childpid = fork()) == 0){
         sigprocmask(SIG_SETMASK, &prev, NULL);
         //setpgid(0, getpgid(STDIN_FILENO));
@@ -468,13 +500,14 @@ int execute(const char *pathname, char *vargs[]){
         int inputfd = pipefd1[0];
         int outputfd = pipefd2[1];
         //debug("%d", redirection);
-        debug("doing this? %ld", (long)outpos);
+        debug("doing this? %ld", (long)inpos);
         if(inpos > 0 && (inpos < outpos || !outpos) && inputfd < 0){
             debug("%s",inpos);
             inpos = trimwhitespace(inpos);
             debug("%s",inpos);
             debug("%zd", strlen(inpos));
             inputfd = open(inpos, O_RDONLY);
+            debug("%d", inputfd);
             if(inputfd < 0){
                 debug("%d", inputfd);
                 printf(SYNTAX_ERROR, "invalid file name");
@@ -496,6 +529,10 @@ int execute(const char *pathname, char *vargs[]){
         if(inputfd >= 0){
             debug("duping %d", inputfd);
             dup2(inputfd, STDIN_FILENO);
+            /*char c;
+            while((c = getchar()) != EOF){
+                debug("%c", c);
+            }*/
         }
         if(outputfd >= 0){
             debug("duping %d", outputfd);
@@ -517,17 +554,30 @@ int execute(const char *pathname, char *vargs[]){
                 "exit: closes the shell\n");
             exitfork(EXIT_SUCCESS, inputfd, outputfd);
         }
+        debug("%s", "built-ins");
         char execpath[256] = {0};
         if(strstr(pathname, "/") == pathname)
             strcat(execpath, pathname);
         else
             strcat(strcat(strcat(execpath, currentDir), "/"), pathname);
-        int error = execv(pathname, vargs);
-        debug("%s", "program executed");
-        if(error == -1){
-            debug("%d, %d\n", error, errno);
-            exitfork(EXIT_FAILURE, inputfd, outputfd);
+        debug("%s", "executing program");
+        //sigprocmask(SIG_BLOCK, &mask, &prev);
+        if((childpid = fork()) == 0){
+            //sigprocmask(SIG_SETMASK, &prev, NULL);
+            execv(pathname, vargs);
+            exit(EXIT_SUCCESS);
         }
+        while(childpid != pid)
+            sigsuspend(&prev);
+        close(pipefd1[0]);
+        //close(pipefd1[1]);
+        //close(pipefd2[0]);
+        close(pipefd2[1]);
+        //sigprocmask(SIG_SETMASK, &mask, &prev);
+        debug("%s", "program executed");
+        /*if(error == -1){
+            exitfork(EXIT_FAILURE, inputfd, outputfd);
+        }*/
 
         if(inpos > 0 && inpos > outpos && inputfd < 0){
             inpos = trimwhitespace(inpos);
@@ -544,20 +594,31 @@ int execute(const char *pathname, char *vargs[]){
                     putchar(c);
             }
         }
-        memcpy(pipefd1, pipefd2, sizeof(int) * 2);
-        memset(pipefd2, -1, sizeof(int) * 2);
-        if(token != NULL){
-            token = trimwhitespace(token);
-            findexecutable(token);
-        }
         exitfork(EXIT_SUCCESS, inputfd, outputfd);
+    }
+    else{
+        //close(pipefd1[0]);
+        //close(pipefd1[1]);
+        //close(pipefd2[0]);
+        close(pipefd2[1]);
     }
     //setpgid(childpid, getpid());
     //tcsetpgrp(0, getpid());
-    while(pid != childpid)
-        sigsuspend(&prev);
+    memcpy(pipefd1, pipefd2, sizeof(int) * 2);
+    memset(pipefd2, -1, sizeof(int) * 2);
+    debug("%s", token);
+    if(token != NULL){
+        token = trimwhitespace(token);
+        findexecutable(token);
+    }
+    else{
+        sigprocmask(SIG_BLOCK, &mask, &prev);
+        while(childpid != pid)
+            sigsuspend(&prev);
+        sigprocmask(SIG_SETMASK, &prev, NULL);
+    }
     //for now just reap the child
-    sigprocmask(SIG_SETMASK, &prev, NULL);
+
     //signal(SIGINT, SIG_DFL);
 
     //wait(NULL);
