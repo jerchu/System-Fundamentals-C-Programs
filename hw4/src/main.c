@@ -101,7 +101,8 @@ int main(int argc, char *argv[], char* envp[]) {
     sigaddset(&mask, SIGCHLD);
     sigprocmask(SIG_BLOCK, &mask, &prev);
     //sigaddset(&mask, SIGINT);
-    setpgid(0,0);
+    if(getpgid(0) < 0)
+        setpgid(0,0);
     tcsetpgrp(STDIN_FILENO, getpgid(0));
     tcsetpgrp(STDOUT_FILENO, getpgid(0));
     char* input;
@@ -467,7 +468,7 @@ int main(int argc, char *argv[], char* envp[]) {
             if(!bgproc){
                 tcsetpgrp(STDIN_FILENO, getpgid(childpid));
                 tcsetpgrp(STDOUT_FILENO, getpgid(childpid));
-                while(!pid)
+                while(childpid != pid)
                     sigsuspend(&prev);
                 /*if(WIFEXITED(status)){
                     if(WEXITSTATUS(status)==EXIT_FAILURE)
