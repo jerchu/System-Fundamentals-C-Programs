@@ -16,15 +16,15 @@
 #define OUTPUT_REDIRECTION 3
 
 /* colors */
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_GREEN   "\x1b[32m"
-#define ANSI_COLOR_YELLOW  "\x1b[33m"
-#define ANSI_COLOR_BLUE    "\x1b[34m"
-#define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN    "\x1b[36m"
-#define ANSI_COLOR_WHITE   "\x1b[37m"
-#define ANSI_COLOR_RESET   "\x1b[0m"
-#define ANSI_COLOR_BROWN   "\x1b[38;5;130m"
+#define ANSI_COLOR_RED     "\001\x1b[31m\002"
+#define ANSI_COLOR_GREEN   "\001\x1b[32m\002"
+#define ANSI_COLOR_YELLOW  "\001\x1b[33m\002"
+#define ANSI_COLOR_BLUE    "\001\x1b[34m\002"
+#define ANSI_COLOR_MAGENTA "\001\x1b[35m\002"
+#define ANSI_COLOR_CYAN    "\001\x1b[36m\002"
+#define ANSI_COLOR_WHITE   "\001\x1b[37m\002"
+#define ANSI_COLOR_RESET   "\001\x1b[0m\002"
+#define ANSI_COLOR_BROWN   "\001\x1b[38;5;130m\002"
 
 
 #endif

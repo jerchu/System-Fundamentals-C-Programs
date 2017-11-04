@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +12,7 @@
 #include <readline/readline.h>
 #include <signal.h>
 #include <termios.h>
+#include <time.h>
 
 #include "sfish.h"
 #include "debug.h"
@@ -20,6 +22,8 @@ typedef struct JobStruct JobStruct;
 struct JobStruct{
     char *execname;
     pid_t pid;
+    int stopped;
+    int bgproc;
     struct termios tmodes;
     JobStruct *prev;
     JobStruct *next;
@@ -47,10 +51,29 @@ int checkredirection(char *currarg);
 char *trimwhitespace(char *token);
 void exitfork(int success, int inputfd, int outputfd);
 
+void sigchld_handler_shell_bg(int s){
+    int olderrno = errno;
+    pid = waitpid(childpid, &status, WUNTRACED | WNOHANG);
+    errno = olderrno;
+}
+
 void sigchld_handler_shell(int s)
 {
     int olderrno = errno;
     pid = waitpid(childpid, &status, WUNTRACED);
+    JobStruct *job = joblist->next;
+    for(; job!=NULL && job->pid != pid; job = job->next);
+    if(!WIFSTOPPED(status)){
+        if(job){
+            job->prev->next = job->next;
+            if(job->next)
+                job->next->prev = job->prev;
+            free(job);
+        }
+    }
+    else if(job){
+        job->stopped = 1;
+    }
     errno = olderrno;
 }
 void sigchld_handler(int s){
@@ -72,12 +95,15 @@ int main(int argc, char *argv[], char* envp[]) {
     joblist->prev = NULL;
     joblist->next = NULL;
     signal(SIGCHLD, sigchld_handler);
+    signal(SIGINT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
     sigemptyset(&mask);
     sigaddset(&mask, SIGCHLD);
     sigprocmask(SIG_BLOCK, &mask, &prev);
     //sigaddset(&mask, SIGINT);
     setpgid(0,0);
     tcsetpgrp(STDIN_FILENO, getpgid(0));
+    tcsetpgrp(STDOUT_FILENO, getpgid(0));
     char* input;
     bool exited = false;
 
@@ -106,11 +132,68 @@ int main(int argc, char *argv[], char* envp[]) {
             strcat(strcat(prompt, currentDir), " :: jerchu >> ");
         char colorprompt[1000] = {0};
         strcat(strcat(strcat(colorprompt, color), prompt), ANSI_COLOR_RESET);
+
+        /*struct winsize w;
+        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+        //printf("%d\n", w.ws_col);
+        write(1, "\e[s", strlen("\e[s"));
+        write(1, "\e[0G", strlen("\e[0G"));
+        char distancef[100] = {0};
+        sprintf(distancef, "\e[%dC", w.ws_col);
+        write(1, distancef, strlen(distancef));
+        struct tm *timeinfo;
+        time_t mytime;
+        mytime = time(&mytime);
+        timeinfo = localtime(&mytime);
+        char time[100] = {0};
+        strftime(time, 100, STRFTIME_RPRMT, timeinfo);
+        //debug("%s", time);
+        char distanceb[100] = {0};
+        sprintf(distanceb, "\e[%zdD", strlen(time));
+        write(1, distanceb, strlen(distanceb));
+        //write(1, "\e[20;10H", strlen("\e[20;10H"));
+        write(1, time, strlen(time));
+        write(1, "\e[u", strlen("\e[u"));*/
+
+        /*int readerpid;
+        if((readerpid = fork()) == 0){
+            setpgid(readerpid, readerpid);
+            while(1){
+                signal(SIGTTOU, SIG_IGN);
+                tcsetpgrp(0, readerpid);
+                signal(SIGTTOU, SIG_DFL);
+                write(1, "\e[s", strlen("\e[s"));
+                write(1, "\e[6n", strlen("\e[6n"));
+                int *x = NULL;
+                int *y = NULL;
+                scanf("\e[%d;%dR", x, y);
+                write(1, "\e[A", strlen("\e[A"));
+                write(1, "\e[0G", strlen("\e[0G"));
+                write(1, distancef, strlen(distancef));
+                write(1, distanceb, strlen(distanceb));
+                debug("%s", w.ws_col - strlen(time));
+                if(w.ws_col - strlen(time) <= *x){
+                    //write(1, "\e[20;10H", strlen("\e[20;10H"));
+                    write(1, "\e[0K", strlen("\e[0K"));
+                }
+                else{
+                    write(1, time, strlen(time));
+                }
+                write(1, "\e[u", strlen("\e[u"));
+                tcsetpgrp(0, getppid());
+            }
+        }*/
+
         input = readline(colorprompt);
+        //kill(readerpid, SIGKILL);
 
         /*write(1, "\e[s", strlen("\e[s"));
-        write(1, "\e[20;10H", strlen("\e[20;10H"));
-        write(1, "SomeText", strlen("SomeText"));
+        write(1, "\e[A", strlen("\e[A"));
+        write(1, "\e[0G", strlen("\e[0G"));
+        write(1, distancef, strlen(distancef));
+        write(1, distanceb, strlen(distanceb));
+        //write(1, "\e[20;10H", strlen("\e[20;10H"));
+        write(1, "\e[0K", strlen("\e[0K"));
         write(1, "\e[u", strlen("\e[u"));*/
 
         // If EOF is read (aka ^D) readline returns NULL
@@ -218,32 +301,35 @@ int main(int argc, char *argv[], char* envp[]) {
                 for(pid_t i = 1; i != jpid && job; job = job->next, i++);
                 if(job){
                     pid = 0;
+                    signal(SIGTTOU, SIG_IGN);
                     debug("%d", getpgid(0));
                     debug("%d", getpgid(job->pid));
                     debug("%d", tcgetpgrp(STDIN_FILENO));
-                    //tcgetattr(STDIN_FILENO, &shell_tmodes);
-                    //tcsetattr(STDIN_FILENO, TCSAFLUSH, &job->tmodes);
+                    tcgetattr(STDIN_FILENO, &shell_tmodes);
+                    tcsetattr(STDIN_FILENO, TCSAFLUSH, &job->tmodes);
                     tcsetpgrp(STDIN_FILENO, getpgid(job->pid));
+                    tcsetpgrp(STDOUT_FILENO, getpgid(job->pid));
                     debug("%d", tcgetpgrp(STDIN_FILENO));
                     //signal(SIGTSTP, SIG_IGN);
-                    signal(SIGTTOU, SIG_IGN);
                     debug("%s", "unsuspended");
-                    killpg(getpgid(job->pid), SIGCONT);
+                    if(job->stopped)
+                        killpg(getpgid(job->pid), SIGCONT);
                     debug("%s", "cont sent");
                     while(!pid)
                         sigsuspend(&prev);
                     debug("%s", "process complete");
                     tcsetpgrp(STDIN_FILENO, getpgid(0));
-                    //tcgetattr(STDIN_FILENO, &job->tmodes);
-                    //tcsetattr(STDIN_FILENO, TCSAFLUSH, &shell_tmodes);
+                    tcsetpgrp(STDOUT_FILENO, getpgid(0));
+                    tcgetattr(STDIN_FILENO, &job->tmodes);
+                    tcsetattr(STDIN_FILENO, TCSAFLUSH, &shell_tmodes);
                     signal(SIGTTOU, SIG_DFL);
                     //sigprocmask(SIG_SETMASK, &prev, NULL);
-                    if(!WIFSTOPPED(status)){
+                    /*if(!WIFSTOPPED(status)){
                         job->prev->next = job->next;
                         if(job->next)
                             job->next->prev = job->prev;
                         free(job);
-                    }
+                    }*/
                     debug("%s", "not stuck at proc mask");
                 }
                 else{
@@ -341,17 +427,27 @@ int main(int argc, char *argv[], char* envp[]) {
                 strcat(name, "...");
             JobStruct *job = malloc(sizeof(JobStruct));
             job->execname = name;
+            job->stopped = 0;
             JobStruct *jobn = joblist;
             for(; jobn->next; jobn = jobn->next);
             job->prev = jobn;
             job->next = NULL;
             jobn->next = job;
+            input = trimwhitespace(input);
+            int bgproc = 0;
+            char *ampersand_index;
+            if((ampersand_index = rindex(input, '&')) == input + strlen(input) - 1){
+                bgproc = 1;
+                *ampersand_index = 0;
+            }
             token = strtok_r(input, "|", &tokptr);
             token = trimwhitespace(token);
             //sigprocmask(SIG_BLOCK, &mask, &prev);
             pid = 0;
             debug("%d", getpgid(0));
             if((job->pid = (childpid = fork())) == 0){
+                signal(SIGINT, SIG_DFL);
+                signal(SIGTSTP, SIG_DFL);
 
                 debug("%d", getpgid(0));
 
@@ -365,39 +461,54 @@ int main(int argc, char *argv[], char* envp[]) {
             //debug("%d", job->pid);
             tcgetattr(STDIN_FILENO, &shell_tmodes);
             setpgid(childpid, childpid);
-            tcsetpgrp(STDIN_FILENO, getpgid(childpid));
             //debug("%d, %d", tcsetpgrp(STDOUT_FILENO, getpgid(childpid)), errno);
             //printf("%d", tcgetpgrp(0));
             signal(SIGTTOU, SIG_IGN);
-            while(!pid)
-                sigsuspend(&prev);
-            /*if(WIFEXITED(status)){
-                if(WEXITSTATUS(status)==EXIT_FAILURE)
-                    printf(EXEC_ERROR, "process failed to execute");
-            }*/
-            debug("%d", tcgetpgrp(0));
-            if(WIFSTOPPED(status))
+            if(!bgproc){
+                tcsetpgrp(STDIN_FILENO, getpgid(childpid));
+                tcsetpgrp(STDOUT_FILENO, getpgid(childpid));
+                while(!pid)
+                    sigsuspend(&prev);
+                /*if(WIFEXITED(status)){
+                    if(WEXITSTATUS(status)==EXIT_FAILURE)
+                        printf(EXEC_ERROR, "process failed to execute");
+                }*/
+                debug("%d", tcgetpgrp(0));
+                if(WIFSTOPPED(status))
+                    tcgetattr(STDIN_FILENO, &job->tmodes);
+                tcsetpgrp(STDIN_FILENO, getpgid(0));
+                tcsetpgrp(STDOUT_FILENO, getpgid(0));
+                tcsetattr(STDIN_FILENO, TCSAFLUSH, &shell_tmodes);
+                //tcsetpgrp(STDOUT_FILENO, getpgid(0));
+                signal(SIGTTOU, SIG_DFL);
+                //sigprocmask(SIG_SETMASK, &prev, NULL);
+                /*if(!WIFSTOPPED(status)){
+                    job->prev->next = job->next;
+                    if(job->next)
+                        job->next->prev = job->prev;
+                    free(job);
+                }
+                else{
+                    job->stopped = 1;
+                }*/
+            }
+            else{
                 tcgetattr(STDIN_FILENO, &job->tmodes);
-            tcsetpgrp(STDIN_FILENO, getpgid(0));
-            tcsetattr(STDIN_FILENO, TCSAFLUSH, &shell_tmodes);
-            //tcsetpgrp(STDOUT_FILENO, getpgid(0));
-            signal(SIGTTOU, SIG_DFL);
-            //sigprocmask(SIG_SETMASK, &prev, NULL);
-            if(!WIFSTOPPED(status)){
-                job->prev->next = job->next;
-                if(job->next)
-                    job->next->prev = job->prev;
-                free(job);
+                tcsetpgrp(STDIN_FILENO, getpgid(0));
+                tcsetpgrp(STDOUT_FILENO, getpgid(0));
+                tcsetattr(STDIN_FILENO, TCSAFLUSH, &shell_tmodes);
+                signal(SIGTTOU, SIG_DFL);
             }
             debug("%s", "not stuck at proc mask");
         }
-
         // Readline mallocs the space for input. You must free it.
         rl_free(input);
 
     } while(!exited);
 
     debug("%s", "user entered 'exit'");
+    for(JobStruct *job = joblist->next; job!=NULL; job = job->next)
+        killpg(getpgid(job->pid), SIGKILL);
 
     return EXIT_SUCCESS;
 }
@@ -629,6 +740,7 @@ int execute(const char *pathname, char *vargs[]){
             strcat(strcat(strcat(execpath, currentDir), "/"), pathname);
         debug("%s", "executing program");
         //sigprocmask(SIG_BLOCK, &mask, &prev);
+        debug("%d, %d", inputfd, outputfd);
         if((childpid = fork()) == 0){
             //sigprocmask(SIG_SETMASK, &prev, NULL);
             execv(pathname, vargs);
@@ -665,9 +777,9 @@ int execute(const char *pathname, char *vargs[]){
                     putchar(c);
             }
         }
-        else if(inpos > 0 && inputfd >= 0){
+        /*else if(inpos > 0 && inputfd >= 0){
             printf(SYNTAX_ERROR, "redirection < cannot be used after a pipeline");
-        }
+        }*/
         exitfork(EXIT_SUCCESS, inputfd, outputfd);
     }
     else{
