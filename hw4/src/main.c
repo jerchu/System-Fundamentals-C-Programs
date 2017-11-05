@@ -186,6 +186,8 @@ int main(int argc, char *argv[], char* envp[]) {
         }*/
 
         input = readline(colorprompt);
+        char *inputdup = input;
+        input = trimwhitespace(input);
         //kill(readerpid, SIGKILL);
 
         /*write(1, "\e[s", strlen("\e[s"));
@@ -219,70 +221,73 @@ int main(int argc, char *argv[], char* envp[]) {
                 "pwd: prints the current working directory\n"
                 "exit: closes the shell\n");
         }*/
-/*else*/if(strstr(input, "cd") != NULL) {
+/*else*/if(strstr(input, "cd") == input && (*(input + strlen("cd")) == ' ' || *(input + strlen("cd")) == 0)) {
             char *tempinput = calloc(strlen(input), 1);
             tempinput = strcpy(tempinput, input);
             char *inputptr;
             char *tokinput = strtok_r(input, " ", &inputptr);
-            //if(strcmp(tokinput, "cd"))
-                //printf(EXEC_NOT_FOUND, input);
-            tokinput = strtok_r(NULL, " ", &inputptr);
-            if(tokinput == NULL){
-                memset(prevDir, 0, 256);
-                strcpy(prevDir, currentDir);
-                strcpy(currentDir, home);
-                chdir(currentDir);
-            }
-            else if(strcmp(tokinput, "-") == 0){
-                if(strlen(prevDir)){
-                    char tempDir[256] = {0};
-                    strcpy(tempDir, currentDir);
-                    strcpy(currentDir, prevDir);
-                    strcpy(prevDir, tempDir);
-                    chdir(currentDir);
-                    //printf("%s\n", currentDir);
-                }
-                else{
-                    printf(BUILTIN_ERROR, "cd: No previous directory");
-                }
+            if(strcmp(tokinput, "cd")){
+                printf(EXEC_NOT_FOUND, input);
             }
             else{
-                char newdir[256] = {0};
-                if(tokinput[0] == '.'){
-                    chdir(".");
-                    if(tokinput[1] == '.'){
-                        chdir("..");
-                    }
-                    for(;*tokinput && *tokinput != '/'; tokinput++);
-                    if(*tokinput == '/'){tokinput++;}
+                tokinput = strtok_r(NULL, " ", &inputptr);
+                if(tokinput == NULL){
+                    memset(prevDir, 0, 256);
+                    strcpy(prevDir, currentDir);
+                    strcpy(currentDir, home);
+                    chdir(currentDir);
                 }
-                else if(tokinput[0] == '~'){
-                    chdir(home);
-                    for(;*tokinput && *tokinput != '/'; tokinput++);
-                    if(*tokinput == '/'){tokinput++;}
-                }
-                memset(prevDir, 0, 256);
-                strcpy(prevDir, currentDir);
-                memset(currentDir, 0, 256);
-                getcwd(currentDir, 256);
-                if(*tokinput){
-                    //printf("%s%s\n", currentDir, tokinput);
-                    //strcat(newdir, "./");
-                    strcat(newdir, tokinput);
-                    int success = chdir(newdir);
-                    if(success > -1){
-                        memset(prevDir, 0, 256);
-                        strcpy(prevDir, currentDir);
-                        memset(currentDir, 0, 256);
-                        getcwd(currentDir, 256);
+                else if(strcmp(tokinput, "-") == 0){
+                    if(strlen(prevDir)){
+                        char tempDir[256] = {0};
+                        strcpy(tempDir, currentDir);
+                        strcpy(currentDir, prevDir);
+                        strcpy(prevDir, tempDir);
+                        chdir(currentDir);
+                        //printf("%s\n", currentDir);
                     }
                     else{
-                        char errstr[1000] = {0};
-                        sprintf(errstr, "cd: there was a problem going to directory %s\n", newdir);
-                        printf(BUILTIN_ERROR, errstr);
+                        printf(BUILTIN_ERROR, "cd: No previous directory");
                     }
                 }
-                //printf(EXEC_NOT_FOUND, input);
+                else{
+                    char newdir[256] = {0};
+                    if(tokinput[0] == '.'){
+                        chdir(".");
+                        if(tokinput[1] == '.'){
+                            chdir("..");
+                        }
+                        for(;*tokinput && *tokinput != '/'; tokinput++);
+                        if(*tokinput == '/'){tokinput++;}
+                    }
+                    else if(tokinput[0] == '~'){
+                        chdir(home);
+                        for(;*tokinput && *tokinput != '/'; tokinput++);
+                        if(*tokinput == '/'){tokinput++;}
+                    }
+                    memset(prevDir, 0, 256);
+                    strcpy(prevDir, currentDir);
+                    memset(currentDir, 0, 256);
+                    getcwd(currentDir, 256);
+                    if(*tokinput){
+                        //printf("%s%s\n", currentDir, tokinput);
+                        //strcat(newdir, "./");
+                        strcat(newdir, tokinput);
+                        int success = chdir(newdir);
+                        if(success > -1){
+                            memset(prevDir, 0, 256);
+                            strcpy(prevDir, currentDir);
+                            memset(currentDir, 0, 256);
+                            getcwd(currentDir, 256);
+                        }
+                        else{
+                            char errstr[1000] = {0};
+                            sprintf(errstr, "cd: there was a problem going to directory %s\n", newdir);
+                            printf(BUILTIN_ERROR, errstr);
+                        }
+                    }
+                    //printf(EXEC_NOT_FOUND, input);
+                }
             }
         }
         else if(strstr(input, "jobs")>0){
@@ -503,7 +508,7 @@ int main(int argc, char *argv[], char* envp[]) {
             debug("%s", "not stuck at proc mask");
         }
         // Readline mallocs the space for input. You must free it.
-        rl_free(input);
+        rl_free(inputdup);
 
     } while(!exited);
 
