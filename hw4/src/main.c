@@ -42,7 +42,10 @@ char *outpos;
 char *inpos;
 char *color = ANSI_COLOR_RESET;
 JobStruct *joblist;
+pid_t prevpid = 0;
 struct termios shell_tmodes;
+int totalcommands = 0;
+int countedcommands = 0;
 
 int execute(const char *pathname, char *vargs[]);
 int prepexecute(char *execpath, char *currarg, char *inputptr);
@@ -51,11 +54,11 @@ int checkredirection(char *currarg);
 char *trimwhitespace(char *token);
 void exitfork(int success, int inputfd, int outputfd);
 
-void sigchld_handler_shell_bg(int s){
+/*void sigchld_handler_shell_bg(int s){
     int olderrno = errno;
     pid = waitpid(childpid, &status, WUNTRACED | WNOHANG);
     errno = olderrno;
-}
+}*/
 
 void sigchld_handler_shell(int s)
 {
@@ -83,6 +86,21 @@ void sigchld_handler(int s){
 }
 void sigint_handler(int s)
 {
+    if(childpid > 0){
+        //kill(childpid, SIGINT);
+        waitpid(childpid, &status, 0);
+    }
+    signal(SIGINT, SIG_DFL);
+    raise(SIGINT);
+}
+
+void sigint_handler_process(int s){
+    if(prevpid > 0){
+        waitpid(prevpid, &status, 0);
+    }
+    signal(SIGINT, SIG_DFL);
+    raise(SIGCONT);
+    raise(SIGINT);
 }
 
 void sigtstp_handler(int s)
@@ -319,10 +337,11 @@ int main(int argc, char *argv[], char* envp[]) {
                     debug("%d", tcgetpgrp(STDIN_FILENO));
                     //signal(SIGTSTP, SIG_IGN);
                     debug("%s", "unsuspended");
+                    childpid = job->pid;
                     if(job->stopped)
                         killpg(getpgid(job->pid), SIGCONT);
                     debug("%s", "cont sent");
-                    while(!pid)
+                    while(childpid != pid)
                         sigsuspend(&prev);
                     debug("%s", "process complete");
                     tcsetpgrp(STDIN_FILENO, getpgid(0));
@@ -431,6 +450,14 @@ int main(int argc, char *argv[], char* envp[]) {
             printf("%s\n", currentDir);
         }*/
         else if(!exited){
+            if(index(input, '|') == input){
+                printf(SYNTAX_ERROR, "no command before |");
+                continue;
+            }
+            else if(rindex(input, '|') != NULL && *(rindex(input, '|') + 1) == 0){
+                printf(SYNTAX_ERROR, "no command after last |");
+                continue;
+            }
             char *token;
             //ExecStruct **exec = calloc(1, sizeof(ExecStruct))
             char *name = malloc(50);
@@ -445,7 +472,7 @@ int main(int argc, char *argv[], char* envp[]) {
             job->prev = jobn;
             job->next = NULL;
             jobn->next = job;
-            input = trimwhitespace(input);
+            //input = trimwhitespace(input);
             int bgproc = 0;
             char *ampersand_index;
             if((ampersand_index = rindex(input, '&')) == input + strlen(input) - 1){
@@ -457,9 +484,11 @@ int main(int argc, char *argv[], char* envp[]) {
             //sigprocmask(SIG_BLOCK, &mask, &prev);
             pid = 0;
             debug("%d", getpgid(0));
+            signal(SIGCHLD, sigchld_handler_shell);
             if((job->pid = (childpid = fork())) == 0){
-                signal(SIGINT, SIG_DFL);
+                signal(SIGINT, sigint_handler);
                 signal(SIGTSTP, SIG_DFL);
+                signal(SIGCHLD, sigchld_handler);
 
                 debug("%d", getpgid(0));
 
@@ -468,7 +497,6 @@ int main(int argc, char *argv[], char* envp[]) {
                 findexecutable(token);
                 exit(EXIT_SUCCESS);
             }
-            signal(SIGCHLD, sigchld_handler_shell);
             //job->pid = childpid;
             //debug("%d", job->pid);
             tcgetattr(STDIN_FILENO, &shell_tmodes);
@@ -513,6 +541,24 @@ int main(int argc, char *argv[], char* envp[]) {
             }
             debug("%s", "not stuck at proc mask");
         }
+        for(JobStruct *job = joblist->next; job!=NULL; job = job->next){
+            if(kill(job->pid, 0) < 0){
+                printf("no job with this pid");
+                job->prev->next = job->next;
+                if(job->next)
+                    job->next->prev = job->prev;
+                free(job);
+            }
+            else{
+                int thispid = waitpid(-1, &status, WUNTRACED | WNOHANG);
+                if(thispid == job->pid){
+                    job->prev->next = job->next;
+                    if(job->next)
+                        job->next->prev = job->prev;
+                    free(job);
+                }
+            }
+        }
         // Readline mallocs the space for input. You must free it.
         rl_free(inputdup);
 
@@ -548,9 +594,17 @@ int findexecutable(char *input){
         *outpos = 0;
         outpos++;
     }
+    if(input[0] == 0){
+        printf(SYNTAX_ERROR, "no command before redirection >");
+        exit(EXIT_FAILURE);
+    }
     if(inpos > 0){
         *inpos = 0;
         inpos++;
+    }
+    if(input[0] == 0){
+        printf(SYNTAX_ERROR, "no command before redirection <");
+        exit(EXIT_FAILURE);
     }
     char *inputptr;
     char *currarg = strtok_r(input, " ", &inputptr);
@@ -572,6 +626,7 @@ int findexecutable(char *input){
             char errstr[1000] = {0};
             sprintf(errstr, "%s: command not found", currarg);
             printf(EXEC_ERROR, errstr);
+            exit(EXIT_FAILURE);
         }
     }
     else if(currarg != NULL){
@@ -754,16 +809,19 @@ int execute(const char *pathname, char *vargs[]){
         //sigprocmask(SIG_BLOCK, &mask, &prev);
         debug("%d, %d", inputfd, outputfd);
         if((childpid = fork()) == 0){
+            //signal(SIGINT, sigint_handler_process);
             //sigprocmask(SIG_SETMASK, &prev, NULL);
             execv(pathname, vargs);
             exit(EXIT_FAILURE);
         }
+        sigprocmask(SIG_BLOCK, &mask, &prev);
         while(childpid != pid)
             sigsuspend(&prev);
         if(WIFEXITED(status)){
             if(WEXITSTATUS(status) == EXIT_FAILURE)
                 exit(EXIT_FAILURE);
         }
+        sigprocmask(SIG_SETMASK, &prev, NULL);
         close(pipefd1[0]);
         //close(pipefd1[1]);
         //close(pipefd2[0]);
@@ -795,6 +853,7 @@ int execute(const char *pathname, char *vargs[]){
         exitfork(EXIT_SUCCESS, inputfd, outputfd);
     }
     else{
+        prevpid = childpid;
         //close(pipefd1[0]);
         //close(pipefd1[1]);
         //close(pipefd2[0]);
@@ -813,10 +872,10 @@ int execute(const char *pathname, char *vargs[]){
         sigprocmask(SIG_BLOCK, &mask, &prev);
         while(childpid != pid){
             sigsuspend(&prev);
-            if(WIFEXITED(status)){
-                if(WEXITSTATUS(status) == EXIT_FAILURE)
-                    exit(EXIT_FAILURE);
-            }
+        }
+        if(WIFEXITED(status)){
+            if(WEXITSTATUS(status) == EXIT_FAILURE)
+                exit(EXIT_FAILURE);
         }
         sigprocmask(SIG_SETMASK, &prev, NULL);
     }
