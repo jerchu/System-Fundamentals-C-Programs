@@ -136,12 +136,13 @@ int main(int argc, char *argv[], char* envp[]) {
 
         /*struct winsize w;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+        //rightprompt = {0};
         //printf("%d\n", w.ws_col);
         write(1, "\e[s", strlen("\e[s"));
         write(1, "\e[0G", strlen("\e[0G"));
         char distancef[100] = {0};
         sprintf(distancef, "\e[%dC", w.ws_col);
-        write(1, distancef, strlen(distancef));
+        //write(0, distancef, strlen(distancef));
         struct tm *timeinfo;
         time_t mytime;
         mytime = time(&mytime);
@@ -190,14 +191,14 @@ int main(int argc, char *argv[], char* envp[]) {
         input = trimwhitespace(input);
         //kill(readerpid, SIGKILL);
 
-        /*write(1, "\e[s", strlen("\e[s"));
-        write(1, "\e[A", strlen("\e[A"));
-        write(1, "\e[0G", strlen("\e[0G"));
-        write(1, distancef, strlen(distancef));
-        write(1, distanceb, strlen(distanceb));
+        /*write(0, "\e[s", strlen("\e[s"));
+        write(0, "\e[A", strlen("\e[A"));
+        write(0, "\e[0G", strlen("\e[0G"));
+        write(0, distancef, strlen(distancef));
+        write(0, distanceb, strlen(distanceb));
         //write(1, "\e[20;10H", strlen("\e[20;10H"));
-        write(1, "\e[0K", strlen("\e[0K"));
-        write(1, "\e[u", strlen("\e[u"));*/
+        write(0, "\e[0K", strlen("\e[0K"));
+        write(0, "\e[u", strlen("\e[u"));*/
 
         // If EOF is read (aka ^D) readline returns NULL
         if(input == NULL) {
@@ -290,21 +291,21 @@ int main(int argc, char *argv[], char* envp[]) {
                 }
             }
         }
-        else if(strstr(input, "jobs")>0){
+        else if(strstr(input, "jobs")==input && (*(input + strlen("jobs"))==' ' || *(input + strlen("jobs"))==0)){
             int i = 1;
             for(JobStruct *job = joblist->next; job; job = job->next, i++){
                 printf("[%d] %s\n", i, job->execname);
             }
         }
-        else if(strstr(input, "fg")>0){
+        else if(strstr(input, "fg")==input && (*(input + strlen("fg")) == ' ' || *(input + strlen("fg"))==0)){
             char *inputptr;
             strtok_r(input, " ", &inputptr);
             char *tok = strtok_r(NULL, " ", &inputptr);
-            pid_t jpid;
+            pid_t jpid = -1;
             if(tok != NULL && tok[0] == '%' && strspn(tok+1, "0123456789") == strlen(tok+1)){
                 jpid = atoi(tok+1);
                 JobStruct *job = joblist->next;
-                for(pid_t i = 1; i != jpid && job; job = job->next, i++);
+                for(pid_t i = 1; job && i != jpid; job = job->next, i++);
                 if(job){
                     pid = 0;
                     signal(SIGTTOU, SIG_IGN);
@@ -345,12 +346,17 @@ int main(int argc, char *argv[], char* envp[]) {
                 }
             }
             else{
-                char errstr[1000] = {0};
-                sprintf(errstr, "fg: %d is not a valid job", jpid);
-                printf(BUILTIN_ERROR, errstr);
+                if(jpid >= 0){
+                    char errstr[1000] = {0};
+                    sprintf(errstr, "fg: %d is not a valid job", jpid);
+                    printf(BUILTIN_ERROR, errstr);
+                }
+                else{
+                    printf(BUILTIN_ERROR, "fg: requires one argument");
+                }
             }
         }
-        else if(strstr(input, "kill")>0){
+        else if(strstr(input, "kill")==input && (*(input + strlen("kill")) == ' ' || *(input + strlen("kill"))==0)){
             char *inputptr;
             strtok_r(input, " ", &inputptr);
             char *tok = strtok_r(NULL, " ", &inputptr);
@@ -361,7 +367,7 @@ int main(int argc, char *argv[], char* envp[]) {
                 if(strspn(tok+1, "0123456789") == strlen(tok+1)){
                     jpid = atoi(tok+1);
                     job = joblist->next;
-                    for(pid_t i = 1; i != jpid && job; job = job->next, i++);
+                    for(pid_t i = 1; job && i != jpid; job = job->next, i++);
                     if(job)
                         jpid = job->pid;
                 }
@@ -370,7 +376,7 @@ int main(int argc, char *argv[], char* envp[]) {
                 if(strspn(tok, "0123456789") == strlen(tok)){
                     jpid = atoi(tok);
                     job = joblist->next;
-                    for(;jpid != job->pid && job; job = job->next);
+                    for(; job && jpid != job->pid; job = job->next);
                 }
             }
             int error;
@@ -380,16 +386,14 @@ int main(int argc, char *argv[], char* envp[]) {
                 error = kill(jpid, SIGKILL);
             }
             else{
+                printf(BUILTIN_ERROR, "kill: requires one argument");
+            }
+            if(error < 0 && jpid > -1){
                 char errstr[1000] = {0};
                 sprintf(errstr, "kill: there was a problem killing process %s", tok);
                 printf(BUILTIN_ERROR, errstr);
             }
-            if(error < 0){
-                char errstr[1000] = {0};
-                sprintf(errstr, "kill: there was a problem killing process %s", tok);
-                printf(BUILTIN_ERROR, errstr);
-            }
-            else{
+            else if(jpid > -1){
                 if(job){
                     job->prev->next = job->next;
                     if(job->next)
@@ -398,11 +402,13 @@ int main(int argc, char *argv[], char* envp[]) {
                 }
             }
         }
-        else if(strstr(input, "color")>0){
+        else if(strstr(input, "color")==input && (*(input + strlen("color")) == ' ' || *(input + strlen("color"))==0)){
             char *inputptr;
             strtok_r(input, " ", &inputptr);
             char *tok = strtok_r(NULL, " ", &inputptr);
-            if(strcmp(tok, "RED")==0)
+            if(tok == NULL)
+                printf(BUILTIN_ERROR, "color: requires one argument");
+            else if(strcmp(tok, "RED")==0)
                 color = ANSI_COLOR_RED;
             else if(strcmp(tok, "GRN")==0)
                 color = ANSI_COLOR_GREEN;
