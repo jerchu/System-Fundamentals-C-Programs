@@ -568,7 +568,7 @@ int main(int argc, char *argv[], char* envp[]) {
     for(JobStruct *job = joblist->next; job!=NULL; job = job->next)
         killpg(getpgid(job->pid), SIGKILL);
 
-    return EXIT_SUCCESS;
+    exit(EXIT_SUCCESS);
 }
 
 char *trimwhitespace(char *token){
