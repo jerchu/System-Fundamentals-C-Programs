@@ -37,48 +37,169 @@ bool put(hashmap_t *self, map_key_t key, map_val_t val, bool force) {
     }
     pthread_mutex_lock(&self->write_lock);
     while(self->num_readers > 0);
+    self->num_readers = -1;
     pthread_mutex_lock(&self->fields_lock);
+    if(self->invalid){
+        self->num_readers = -1;
+        pthread_mutex_unlock(&self->fields_lock);
+        pthread_mutex_unlock(&self->write_lock);
+        errno = EINVAL;
+        return MAP_NODE(MAP_KEY(NULL, 0), MAP_VAL(NULL, 0), false);
+    }
     int start_index = get_index(self, key);
     if(self->capacity == self->size && force){
-        self->nodes[index]->val = val;
+        self->nodes[start_index]->key = key;
+        self->nodes[start_index]->val = val;
+        self->nodes[start_index]->tombstone = false;
         self->size--;
     }
     else if(!can_put_key(self->nodes[start_index], key))
     {
+        map_node_t first_tombstone = NULL;
+        if(!first_tombstone && self->nodes[start_index]->tombstone){
+            first_tombstone = self->nodes[start_index];
+        }
         int index = (start_index+1)%self->capacity;
         while(index != start_index && !can_put_key(self->nodes[index], key))
         {
+            if(!first_tombstone && self->nodes[index]->tombstone){
+                first_tombstone = self->nodes[index];
+            }
             index = (index+1)%self->capacity;
         }
         if(index != start_index){
+            if(node_is_empty(self->nodes[index])){
+                self->nodes[index]->key = key;
+                self->nodes[index]->tombstone = false;
+            }
             self->nodes[index]->val = val;
         }
         else{
-            while(!self->nodes[index]->tombstone){
-                index = (index+1)%self->capacity;
-            }
-            self->nodes[index]->val = val;
+            first_tombstone->key = key;
+            first_tombstone->val = val;
+            first_tombstone->tombstone = false;
         }
     }
     else{
         self->nodes[index]->val = val;
     }
     self->size++;
+    self->num_readers = 0;
     pthread_mutex_unlock(&self->fields_lock);
     pthread_mutex_unlock(&self->write_lock);
     return true;
 }
 
 map_val_t get(hashmap_t *self, map_key_t key) {
-    return MAP_VAL(NULL, 0);
+    if(!self || !key || self->invalid){
+        errno = EINVAL;
+        return MAP_VAL(NULL, 0);
+    }
+    while(num_readers < 0);
+    pthread_mutex_lock(self->fields_lock);
+    if(self->invalid){
+        pthread_mutex_unlock(&self->fields_lock);
+        errno = EINVAL;
+        return MAP_VAL(NULL, 0);
+    }
+    self->num_readers++;
+    pthread_mutex_unlock(self->fields_lock);
+    map_val_t ret_val = MAP_VAL(NULL, 0);
+    int start_index = get_index(self, key);
+    if(node_is_empty(self->nodes[start_index])){
+        ret_val = MAP_VAL(NULL, 0);
+    }
+    else if(node_has_key(self->node[start_index], key)){
+        ret_val = self->node[start_index]->val;
+    }
+    else{
+        int index = (start_index+1)%self->capacity;
+        while(index != start_index && !node_is_empty(self->node[index]) && !node_has_key(self->node[index], key)){
+            index = (index+1)%self->capacity;
+        }
+        if(node_has_key(self->node[index], key)){
+            ret_val = self->node[index]->val;
+        }
+    }
+    pthread_mutex_lock(self->fields_lock);
+    if(self->invalid){
+        pthread_mutex_unlock(&self->fields_lock);
+        errno = EINVAL;
+        return MAP_VAL(NULL, 0);
+    }
+    self->num_readers--;
+    pthread_mutex_unlock(self->fields_lock);
+    return ret_val;
 }
 
 map_node_t delete(hashmap_t *self, map_key_t key) {
-    return MAP_NODE(MAP_KEY(NULL, 0), MAP_VAL(NULL, 0), false);
+    if(!self || !key || self->invalid){
+        errno = EINVAL;
+        return MAP_NODE(MAP_KEY(NULL, 0), MAP_VAL(NULL, 0), false);
+    }
+    pthread_mutex_lock(&self->write_lock);
+    while(self->num_readers > 0);
+    self->num_readers = -1;
+    pthread_mutex_lock(&self->fields_lock);
+    if(self->invalid){
+        self->num_readers = 0;
+        pthread_mutex_unlock(&self->fields_lock);
+        pthread_mutex_unlock(&self->write_lock);
+        errno = EINVAL;
+        return MAP_NODE(MAP_KEY(NULL, 0), MAP_VAL(NULL, 0), false);
+    }
+    map_node_t ret_node = MAP_NODE(MAP_KEY(NULL, 0), MAP_VAL(NULL, 0), false);
+    int start_index = get_index(self, key);
+    if(node_is_empty(self->nodes[start_index])){
+        ret_node = MAP_NODE(MAP_KEY(NULL, 0), MAP_VAL(NULL, 0), false);
+    }
+    else if(node_has_key(self->node[start_index], key)){
+        ret_node = self->node[start_index];
+        self->node[start_index]->tombstone = true;
+    }
+    else{
+        int index = (start_index+1)%self->capacity;
+        while(index != start_index && !node_is_empty(self->node[index]) && !node_has_key(self->node[index], key)){
+            index = (index+1)%self->capacity;
+        }
+        if(node_has_key(self->node[index], key)){
+            ret_node = self->node[index];
+            self->node[start_index]->tombstone = true;
+        }
+    }
+    self->size--;
+    self->num_readers = 0;
+    pthread_mutex_unlock(&self->fields_lock);
+    pthread_mutex_unlock(&self->write_lock);
+    return ret_node;
 }
 
 bool clear_map(hashmap_t *self) {
-	return false;
+    if(!self || self->invalid){
+        errno = EINVAL;
+        return false;
+    }
+    pthread_mutex_lock(&self->write_lock);
+    while(self->num_readers > 0);
+    self->num_readers = -1;
+    pthread_mutex_lock(&self->fields_lock);
+    if(self->invalid){
+        pthread_mutex_unlock(&self->fields_lock);
+        pthread_mutex_unlock(&self->write_lock);
+        errno = EINVAL;
+        return MAP_NODE(MAP_KEY(NULL, 0), MAP_VAL(NULL, 0), false);
+    }
+    for(int i = 0; i < self->capacity; i++){
+        self->destroy_function(self->nodes[i]->key, self->nodes[i]->val);
+        self->nodes[i]->key = MAP_KEY(NULL, 0);
+        self->nodes[i]->val = MAP_VAL(NULL, 0);
+        self->nodes[i]->tombstone = false;
+    }
+    self->size = 0;
+    self->num_readers = 0;
+    pthread_mutex_unlock(&self->fields_lock);
+    pthread_mutex_unlock(&self->write_lock);
+	return true;
 }
 
 bool invalidate_map(hashmap_t *self) {
@@ -98,5 +219,5 @@ bool node_is_empty(map_node_t *node){
 }
 
 bool get_keys_equal(map_key_t key1, map_key_t key2){
-    return key1->key_base == key2->key_base && key1->key_len == key2->key_len;
+    return key1->key_len == key2->key_len && memcmp(key1->key_base, key2->key_base);
 }
