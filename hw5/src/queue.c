@@ -8,7 +8,8 @@ queue_t *create_queue(void) {
     new_queue->front = calloc(1,sizeof(queue_node_t));
     new_queue->rear = new_queue->front;
     sem_init(&new_queue->items, 0, 0);
-    pthread_mutex_init(&new_queue->lock, NULL);
+    if(pthread_mutex_init(&new_queue->lock, NULL) < 0)
+        return NULL;
     new_queue->invalid = false;
     return new_queue;
 }
