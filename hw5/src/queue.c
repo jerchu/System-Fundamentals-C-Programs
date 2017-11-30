@@ -70,7 +70,7 @@ void *dequeue(queue_t *self) {
     }
     void *item = self->rear->item;
     queue_node_t *next_node = self->rear->next;
-    free(&self->rear);
+    free(self->rear);
     self->rear = next_node;
     pthread_mutex_unlock(&self->lock);
     return item;

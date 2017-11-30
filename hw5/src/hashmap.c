@@ -63,8 +63,8 @@ bool put(hashmap_t *self, map_key_t key, map_val_t val, bool force) {
     }
     else if(!can_put_key(self->nodes[start_index], key))
     {
-        map_key_t bad_key = self->nodes[start_index].key;
-        debug("node with key (%p, %lu) and tombstone = %d was not empty\n",bad_key.key_base, bad_key.key_len, (int)self->nodes[start_index].tombstone );
+        //map_key_t bad_key = self->nodes[start_index].key;
+        //debug("node with key (%p, %lu) and tombstone = %d was not empty\n",bad_key.key_base, bad_key.key_len, (int)self->nodes[start_index].tombstone );
         map_node_t *first_tombstone = NULL;
         if(!first_tombstone && self->nodes[start_index].tombstone){
             first_tombstone = &self->nodes[start_index];
@@ -91,12 +91,15 @@ bool put(hashmap_t *self, map_key_t key, map_val_t val, bool force) {
         }
     }
     else{
+        self->nodes[start_index].key = key;
         self->nodes[start_index].val = val;
     }
     self->size++;
     self->num_readers = 0;
     pthread_mutex_unlock(&self->fields_lock);
     pthread_mutex_unlock(&self->write_lock);
+    debug("put key %s and value %s", (char *)key.key_base, (char *)val.val_base);
+    debug("key: %s val: %s", (char *)self->nodes[start_index].key.key_base, (char *)self->nodes[start_index].val.val_base);
     return true;
 }
 
@@ -117,9 +120,11 @@ map_val_t get(hashmap_t *self, map_key_t key) {
     map_val_t ret_val = MAP_VAL(NULL, 0);
     int start_index = get_index(self, key);
     if(node_is_empty(self->nodes[start_index])){
+        debug("empty :(");
         ret_val = MAP_VAL(NULL, 0);
     }
     else if(node_has_key(self->nodes[start_index], key)){
+        debug("it was here");
         ret_val = self->nodes[start_index].val;
     }
     else{
@@ -128,6 +133,7 @@ map_val_t get(hashmap_t *self, map_key_t key) {
             index = (index+1)%self->capacity;
         }
         if(node_has_key(self->nodes[index], key)){
+            debug("it was somewhere else");
             ret_val = self->nodes[index].val;
         }
     }
@@ -258,10 +264,10 @@ bool node_is_empty(map_node_t node){
 
 bool get_keys_equal(map_key_t key1, map_key_t key2){
     return key1.key_len == key2.key_len && (key1.key_base == key2.key_base ||
-    memcmp(key1.key_base, key2.key_base, key1.key_len));
+    strcmp(key1.key_base, key2.key_base) == 0);
 }
 
 bool get_vals_equal(map_val_t val1, map_val_t val2){
     return val1.val_len == val2.val_len && (val1.val_base == val2.val_base ||
-     memcmp(val1.val_base, val2.val_base, val1.val_len));
+     strcmp(val1.val_base, val2.val_base) == 0);
 }
