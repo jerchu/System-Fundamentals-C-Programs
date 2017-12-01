@@ -1,5 +1,6 @@
 #include "cream.h"
 #include "csapp.h"
+#include "debug.h"
 #include "hashmap.h"
 #include "queue.h"
 #include "utils.h"
@@ -13,6 +14,9 @@ queue_t *requests;
 hashmap_t *cache;
 
 int main(int argc, char *argv[]) {
+
+    signal(SIGPIPE, SIG_IGN);
+
     int NUM_WORKERS;
     //int PORT_NUMBER;
     int MAX_ENTRIES;
@@ -21,7 +25,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_storage clientaddr;
 
 
-    if(strcmp((argv[1]), "-h") == 0){
+    if(argc < 2 || strcmp((argv[1]), "-h") == 0){
         printf("Usage: cream [-h] NUM_WORKERS PORT_NUMBER MAX_ENTRIES\n"
             "-h                 Displays this help menu and returns EXIT_SUCCESS.\n"
             "NUM_WORKERS        The number of worker threads used to service requests.\n"
@@ -31,6 +35,10 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     else{
+        if(argc < 4){
+            printf("not enough arguments\n");
+            exit(1);
+        }
         if(strspn(argv[1], "1234567890") == strlen(argv[1])){
             NUM_WORKERS = atoi(argv[1]);
         }
@@ -76,10 +84,11 @@ void map_free_function(map_key_t key, map_val_t val) {
 void *worker_thread(void *vargsp){
     while(1){
         int connfd = *((int *)dequeue(requests));
+        debug("connfd: %d", connfd);
         request_header_t req_header;
         response_header_t res_header = {UNSUPPORTED, 0};
         map_val_t value;
-        rio_readn(connfd, &req_header, sizeof(request_header_t));
+        Rio_readn(connfd, &req_header, sizeof(request_header_t));
         if(req_header.key_size > MAX_KEY_SIZE || req_header.key_size < MIN_KEY_SIZE ||
             req_header.value_size > MAX_VALUE_SIZE || req_header.value_size < MIN_VALUE_SIZE)
         {
