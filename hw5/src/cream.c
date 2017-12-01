@@ -70,8 +70,9 @@ int main(int argc, char *argv[]) {
     listenfd = Open_listenfd(argv[2]);
     while(1){
         clientlen = sizeof(struct sockaddr_storage);
-        int connfd = Accept(listenfd, (SA *) &clientaddr, &clientlen);
-        enqueue(requests, &connfd);
+        int *connfd = malloc(sizeof(int));
+        *connfd = Accept(listenfd, (SA *) &clientaddr, &clientlen);
+        enqueue(requests, connfd);
     }
     exit(0);
 }
