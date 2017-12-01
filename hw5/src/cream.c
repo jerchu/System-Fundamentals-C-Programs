@@ -8,6 +8,8 @@
 #include <stdlib.h>
 
 void map_free_function(map_key_t key, map_val_t val);
+ssize_t Rio_readn_(int fd, void *ptr, size_t nbytes);
+int Rio_writen_(int fd, void *usrbuf, size_t n);
 void *worker_thread(void *vargsp);
 
 queue_t *requests;
@@ -89,23 +91,38 @@ void *worker_thread(void *vargsp){
         request_header_t req_header;
         response_header_t res_header = {UNSUPPORTED, 0};
         map_val_t value;
-        Rio_readn(connfd, &req_header, sizeof(request_header_t));
-        if(req_header.key_size > MAX_KEY_SIZE || req_header.key_size < MIN_KEY_SIZE ||
-            req_header.value_size > MAX_VALUE_SIZE || req_header.value_size < MIN_VALUE_SIZE)
+        if(Rio_readn_(connfd, &req_header, sizeof(request_header_t)) < 0)
+            return NULL;
+        if(req_header.key_size > MAX_KEY_SIZE || req_header.value_size > MAX_VALUE_SIZE)
         {
-            //tell client it failed
+            Close(connfd);
+            return NULL;
         }
         void *key = calloc(1, req_header.key_size);
-        Rio_readn(connfd, key, req_header.key_size);
+        if(Rio_readn_(connfd, key, req_header.key_size) < 0)
+            return NULL;
         void *val = calloc(1, req_header.value_size);
-        Rio_readn(connfd, val, req_header.value_size);
+        if(Rio_readn_(connfd, val, req_header.value_size) < 0)
+            return NULL;
         if(req_header.request_code == PUT){
+            if(req_header.key_size < MIN_KEY_SIZE || req_header.value_size < MIN_VALUE_SIZE){
+                res_header.response_code = BAD_REQUEST;
+                Rio_writen(connfd, &req_header, sizeof(response_header_t));
+                Close(connfd);
+                return NULL;
+            }
             if(put(cache, MAP_KEY(key, req_header.key_size), MAP_VAL(val, req_header.value_size), true))
                 res_header.response_code = OK;
             else
                 res_header.response_code = BAD_REQUEST;
         }
         else if(req_header.request_code == GET){
+            if(req_header.key_size < MIN_KEY_SIZE){
+                res_header.response_code = NOT_FOUND;
+                Rio_writen(connfd, &req_header, sizeof(response_header_t));
+                Close(connfd);
+                return NULL;
+            }
             value = get(cache, MAP_KEY(key, req_header.key_size));
             if(value.val_base && value.val_len){
                 res_header.response_code = OK;
@@ -115,6 +132,12 @@ void *worker_thread(void *vargsp){
                 res_header.response_code = NOT_FOUND;
         }
         else if(req_header.request_code == EVICT){
+            if(req_header.key_size < MIN_KEY_SIZE){
+                res_header.response_code = OK;
+                Rio_writen(connfd, &req_header, sizeof(response_header_t));
+                Close(connfd);
+                return NULL;
+            }
             delete(cache, (MAP_KEY(key, req_header.key_size)));
             res_header.response_code = OK;
         }
@@ -125,11 +148,42 @@ void *worker_thread(void *vargsp){
         else{
             res_header.response_code = UNSUPPORTED;
         }
-        Rio_writen(connfd, &res_header, sizeof(response_header_t));
-        if(res_header.value_size > 0)
-            Rio_writen(connfd, value.val_base, value.val_len);
+        if(Rio_writen_(connfd, &res_header, sizeof(response_header_t)) < 0)
+            return NULL;
+        if(res_header.value_size > 0){
+            if(Rio_writen_(connfd, value.val_base, value.val_len) < 0){
+                return NULL;
+            }
+        }
         Close(connfd);
         debug("%s\n", "Task Complete");
     }
     return NULL;
+}
+
+ssize_t Rio_readn_(int fd, void *ptr, size_t nbytes) {
+    ssize_t n;
+    if ((n = rio_readn(fd, ptr, nbytes)) < 0){
+        if(errno == EPIPE){
+            Close(fd);
+            return -1;
+        }
+        else{
+            unix_error("Rio_readn error");
+        }
+    }
+    return n;
+}
+
+int Rio_writen_(int fd, void *usrbuf, size_t n) {
+    if (rio_writen(fd, usrbuf, n) != n){
+        if(errno == EPIPE){
+            Close(fd);
+            return -1;
+        }
+        else{
+            unix_error("Rio_writen error");
+        }
+    }
+    return n;
 }
