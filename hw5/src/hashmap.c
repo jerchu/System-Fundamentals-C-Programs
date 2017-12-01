@@ -78,6 +78,7 @@ bool put(hashmap_t *self, map_key_t key, map_val_t val, bool force) {
             index = (index+1)%self->capacity;
         }
         if(index != start_index){
+            debug("index: %d", index);
             if(node_is_empty(self->nodes[index])){
                 self->nodes[index].key = key;
                 self->nodes[index].tombstone = false;
@@ -88,6 +89,7 @@ bool put(hashmap_t *self, map_key_t key, map_val_t val, bool force) {
             first_tombstone->key = key;
             first_tombstone->val = val;
             first_tombstone->tombstone = false;
+            debug("index tomb: %lu", (first_tombstone - self->nodes)/sizeof(map_node_t));
         }
     }
     else{
@@ -99,7 +101,7 @@ bool put(hashmap_t *self, map_key_t key, map_val_t val, bool force) {
     pthread_mutex_unlock(&self->fields_lock);
     pthread_mutex_unlock(&self->write_lock);
     debug("put key %s and value %s", (char *)key.key_base, (char *)val.val_base);
-    debug("key: %s val: %s", (char *)self->nodes[start_index].key.key_base, (char *)self->nodes[start_index].val.val_base);
+    debug("key: %s val: %s start_index: %d", (char *)self->nodes[start_index].key.key_base, (char *)self->nodes[start_index].val.val_base, start_index);
     return true;
 }
 

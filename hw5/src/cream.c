@@ -25,41 +25,41 @@ int main(int argc, char *argv[]) {
     struct sockaddr_storage clientaddr;
 
 
-    if(argc < 2 || strcmp((argv[1]), "-h") == 0){
-        printf("Usage: cream [-h] NUM_WORKERS PORT_NUMBER MAX_ENTRIES\n"
-            "-h                 Displays this help menu and returns EXIT_SUCCESS.\n"
-            "NUM_WORKERS        The number of worker threads used to service requests.\n"
-            "PORT_NUMBER        Port number to listen on for incoming connections.\n"
-            "MAX_ENTRIES        The maximum number of entries that can be stored in `cream`'s underlying data store.\n"
-        );
-        exit(0);
+    for(int i = 1; i < argc; i++){
+        if(argc < 2 || strcmp(argv[i], "-h") == 0 ){
+            printf("Usage: cream [-h] NUM_WORKERS PORT_NUMBER MAX_ENTRIES\n"
+                "-h                 Displays this help menu and returns EXIT_SUCCESS.\n"
+                "NUM_WORKERS        The number of worker threads used to service requests.\n"
+                "PORT_NUMBER        Port number to listen on for incoming connections.\n"
+                "MAX_ENTRIES        The maximum number of entries that can be stored in `cream`'s underlying data store.\n"
+            );
+            exit(0);
+        }
+    }
+    if(argc < 4){
+        printf("not enough arguments\n");
+        exit(1);
+    }
+    if(strspn(argv[1], "1234567890") == strlen(argv[1])){
+        NUM_WORKERS = atoi(argv[1]);
     }
     else{
-        if(argc < 4){
-            printf("not enough arguments\n");
-            exit(1);
-        }
-        if(strspn(argv[1], "1234567890") == strlen(argv[1])){
-            NUM_WORKERS = atoi(argv[1]);
-        }
-        else{
-            printf("%s is not a valid worker count\n", argv[1]);
-            exit(1);
-        }
-        if(strspn(argv[2], "1234567890") == strlen(argv[2])){
-            //PORT_NUMBER = atoi(argv[3]);
-        }
-        else{
-            printf("%s is not a valid port number\n", argv[2]);
-            exit(1);
-        }
-        if(strspn(argv[3], "1234567890") == strlen(argv[3])){
-            MAX_ENTRIES = atoi(argv[3]);
-        }
-        else{
-            printf("%s is not a valid entry count\n", argv[3]);
-            exit(1);
-        }
+        printf("%s is not a valid worker count\n", argv[1]);
+        exit(1);
+    }
+    if(strspn(argv[2], "1234567890") == strlen(argv[2])){
+        //PORT_NUMBER = atoi(argv[3]);
+    }
+    else{
+        printf("%s is not a valid port number\n", argv[2]);
+        exit(1);
+    }
+    if(strspn(argv[3], "1234567890") == strlen(argv[3])){
+        MAX_ENTRIES = atoi(argv[3]);
+    }
+    else{
+        printf("%s is not a valid entry count\n", argv[3]);
+        exit(1);
     }
     requests = create_queue();
     for(int i = 0; i < NUM_WORKERS; i++){
@@ -128,6 +128,7 @@ void *worker_thread(void *vargsp){
         if(res_header.value_size > 0)
             Rio_writen(connfd, value.val_base, value.val_len);
         Close(connfd);
+        debug("%s\n", "Task Complete");
     }
     return NULL;
 }
