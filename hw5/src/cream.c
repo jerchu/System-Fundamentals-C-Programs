@@ -44,6 +44,10 @@ int main(int argc, char *argv[]) {
     }
     if(strspn(argv[1], "1234567890") == strlen(argv[1])){
         NUM_WORKERS = atoi(argv[1]);
+        if(NUM_WORKERS < 1){
+            printf("%s is not a valid worker count\n", argv[1]);
+            exit(1);
+        }
     }
     else{
         printf("%s is not a valid worker count\n", argv[1]);
@@ -58,6 +62,10 @@ int main(int argc, char *argv[]) {
     }
     if(strspn(argv[3], "1234567890") == strlen(argv[3])){
         MAX_ENTRIES = atoi(argv[3]);
+        if(MAX_ENTRIES < 1){
+            printf("%s is not a valid entry count\n", argv[3]);
+            exit(1);
+        }
     }
     else{
         printf("%s is not a valid entry count\n", argv[3]);
