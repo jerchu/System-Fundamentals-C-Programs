@@ -163,7 +163,7 @@ void *worker_thread(void *vargsp){
                 return NULL;
             }
         }
-        Close(connfd);
+        while(close(connfd) < 0 && errno == EINTR);
         debug("%s\n", "Task Complete");
     }
     return NULL;
