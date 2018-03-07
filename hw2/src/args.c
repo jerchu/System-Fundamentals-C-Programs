@@ -17,6 +17,10 @@ parse_args(int argc, char *argv[])
   int i;
   char option;
   char *joined_argv;
+  if(argc == 1){
+    USAGE(argv[0]);
+    exit(0);
+  }
 
   joined_argv = join_string_array(argc, argv);
   info("argc: %d argv: %s", argc, joined_argv);
@@ -71,19 +75,21 @@ parse_args(int argc, char *argv[])
     USAGE(argv[0]);
     exit(0);
   }
-  int infile = Open(program_state->in_file, O_RDONLY);
-  int outfile = Open(program_state->out_file, O_RDONLY);
-  struct stat infile_stat;
-  struct stat outfile_stat;
-  int file1error = fstat(infile, &infile_stat);
-  int file2error = fstat(outfile, &outfile_stat);
-  if(file1error < 0 || file2error < 0){
-    USAGE(argv[0]);
-    exit(0);
-  }
-  if(infile_stat.st_ino == outfile_stat.st_ino){
-    USAGE(argv[0]);
-    exit(0);
+  if(access(program_state->out_file, F_OK) != -1){
+    int infile = Open(program_state->in_file, O_RDONLY);
+    int outfile = Open(program_state->out_file, O_RDONLY);
+    struct stat infile_stat;
+    struct stat outfile_stat;
+    int file1error = fstat(infile, &infile_stat);
+    int file2error = fstat(outfile, &outfile_stat);
+    if(file1error < 0 || file2error < 0){
+      USAGE(argv[0]);
+      exit(0);
+    }
+    if(infile_stat.st_ino == outfile_stat.st_ino){
+      USAGE(argv[0]);
+      exit(0);
+    }
   }
 }
 

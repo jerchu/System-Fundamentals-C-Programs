@@ -1,0 +1,7 @@
+bin
+build
+include
+Makefile
+Makefile.config
+ping google.com -c 2 | tr '[:lower:]' '[:upper:]'
+exit

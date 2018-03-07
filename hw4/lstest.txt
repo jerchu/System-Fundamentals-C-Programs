@@ -1,0 +1,17 @@
+bin
+build
+cat.txt
+greptest.txt
+grep.txt
+include
+lstest.txt
+Makefile
+Makefile.config
+pwd.txt
+src
+testcmds.sf
+tests
+test.txt
+tst.txt
+ping google.com -c 2 | tr '[:lower:]' '[:upper:]'
+exit
