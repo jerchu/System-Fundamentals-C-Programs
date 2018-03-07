@@ -1,6 +1,0 @@
-include
-Makefile
-Makefile.config
-testcmds.sf
-tests
-test.txt
