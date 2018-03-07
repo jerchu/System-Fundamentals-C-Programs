@@ -1,2 +1,0 @@
-ping google.com -c 2 | tr '[:lower:]' '[:upper:]'
-exit
